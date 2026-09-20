@@ -815,3 +815,31 @@ end $$;
 
 alter table public.quiz_tracking_events add column if not exists send_to_custom_code boolean not null default false;
 alter table public.quiz_tracking_events add column if not exists custom_code text;
+
+-- ============================================================
+-- 11. Public storage bucket for message-block images, so an editor
+--     can upload an image instead of pasting an external URL. Public
+--     read (quiz visitors load these unauthenticated), authenticated
+--     write (any logged-in dashboard user — matches how the rest of
+--     the editor has no per-workspace object ownership yet).
+-- ============================================================
+
+insert into storage.buckets (id, name, public)
+values ('quiz-media', 'quiz-media', true)
+on conflict (id) do nothing;
+
+drop policy if exists "quiz_media_public_read" on storage.objects;
+create policy "quiz_media_public_read" on storage.objects
+  for select using (bucket_id = 'quiz-media');
+
+drop policy if exists "quiz_media_authenticated_write" on storage.objects;
+create policy "quiz_media_authenticated_write" on storage.objects
+  for insert with check (bucket_id = 'quiz-media' and auth.role() = 'authenticated');
+
+drop policy if exists "quiz_media_authenticated_update" on storage.objects;
+create policy "quiz_media_authenticated_update" on storage.objects
+  for update using (bucket_id = 'quiz-media' and auth.role() = 'authenticated');
+
+drop policy if exists "quiz_media_authenticated_delete" on storage.objects;
+create policy "quiz_media_authenticated_delete" on storage.objects
+  for delete using (bucket_id = 'quiz-media' and auth.role() = 'authenticated');
