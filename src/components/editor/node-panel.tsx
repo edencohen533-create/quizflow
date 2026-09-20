@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Plus, Trash2, Copy, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +30,8 @@ import {
   ConditionNodeData,
 } from "@/lib/types";
 import { NODE_META } from "@/components/editor/node-meta";
+import { createClient } from "@/lib/supabase/client";
+import { uploadQuizImage } from "@/lib/supabase/storage";
 
 function uid() {
   return Math.random().toString(36).slice(2, 9);
@@ -115,6 +119,65 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function ImageUploadField({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const supabase = useMemo(() => createClient(), []);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFile(file: File) {
+    setUploading(true);
+    try {
+      const url = await uploadQuizImage(supabase, file);
+      onChange(url);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "העלאת התמונה נכשלה");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      {value && (
+        <div className="relative overflow-hidden rounded-lg border">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={value} alt="" className="h-28 w-full object-cover" />
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon-sm"
+            className="absolute top-1.5 left-1.5"
+            onClick={() => onChange("")}
+          >
+            <X className="size-3.5" />
+          </Button>
+        </div>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFile(file);
+          e.target.value = "";
+        }}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full"
+        disabled={uploading}
+        onClick={() => inputRef.current?.click()}
+      >
+        {uploading ? "מעלה..." : value ? "החלף תמונה" : "העלה תמונה"}
+      </Button>
+    </div>
+  );
+}
+
 function MessageForm({ data, onChange }: { data: MessageNodeData; onChange: (d: QuizNodeData) => void }) {
   return (
     <>
@@ -124,8 +187,8 @@ function MessageForm({ data, onChange }: { data: MessageNodeData; onChange: (d: 
       <Field label="טקסט">
         <Textarea rows={4} value={data.text} onChange={(e) => onChange({ ...data, text: e.target.value })} />
       </Field>
-      <Field label="קישור לתמונה (אופציונלי)">
-        <Input value={data.imageUrl ?? ""} onChange={(e) => onChange({ ...data, imageUrl: e.target.value })} placeholder="https://" />
+      <Field label="תמונה (אופציונלי)">
+        <ImageUploadField value={data.imageUrl ?? ""} onChange={(url) => onChange({ ...data, imageUrl: url })} />
       </Field>
       <Field label="קישור לוידאו (אופציונלי)">
         <Input value={data.videoUrl ?? ""} onChange={(e) => onChange({ ...data, videoUrl: e.target.value })} placeholder="https://" />
