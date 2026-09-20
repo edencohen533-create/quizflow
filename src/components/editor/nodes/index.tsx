@@ -121,7 +121,6 @@ const ACTION_LABEL: Record<ActionNodeData["actionKind"], string> = {
   webhook: "שליחת Webhook",
   crm: "יצירת ליד ב-CRM",
   email: "שליחת אימייל",
-  google_sheets: "הוספה ל-Google Sheets",
   redirect: "Redirect לכתובת URL",
   meta_pixel: "Meta Pixel Event",
   tiktok_pixel: "TikTok Pixel Event",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Webhook as WebhookIcon, Target, Music2, Sheet, Zap, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Plus, Trash2, Webhook as WebhookIcon, Target, Music2, Zap, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -239,21 +239,6 @@ export default function IntegrationsPage() {
           onChanged={load}
         />
       </div>
-
-      <Card className="opacity-70">
-        <CardHeader><CardTitle className="text-base">בקרוב</CardTitle></CardHeader>
-        <CardContent className="grid sm:grid-cols-2 gap-3">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-accent text-accent-foreground shrink-0">
-              <Sheet className="size-4.5" />
-            </span>
-            <div>
-              <p className="font-medium text-sm">Google Sheets</p>
-              <p className="text-xs text-muted-foreground">דורש חיבור OAuth לחשבון Google — יתווסף לצד חיבור המשתמשים.</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       <WebhookDialog open={dialogOpen} onOpenChange={setDialogOpen} workspaceId={workspaceId} onCreated={load} />
     </div>

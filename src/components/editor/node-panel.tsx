@@ -391,7 +391,6 @@ const ACTION_KINDS: { value: ActionKind; label: string }[] = [
   { value: "webhook", label: "שליחת Webhook" },
   { value: "crm", label: "יצירת ליד ב-CRM" },
   { value: "email", label: "שליחת אימייל" },
-  { value: "google_sheets", label: "הוספה ל-Google Sheets" },
   { value: "redirect", label: "Redirect לכתובת URL" },
   { value: "meta_pixel", label: "Meta Pixel Event" },
   { value: "tiktok_pixel", label: "TikTok Pixel Event" },
