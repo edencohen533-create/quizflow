@@ -173,7 +173,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [entries.length]);
+  }, [entries]);
 
   function scrollToBottom() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
