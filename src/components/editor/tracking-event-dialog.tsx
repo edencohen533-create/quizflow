@@ -56,6 +56,8 @@ export function TrackingEventDialog({
   const [sendToPixel, setSendToPixel] = useState(initial?.sendToPixel ?? true);
   const [sendToCapi, setSendToCapi] = useState(initial?.sendToCapi ?? true);
   const [sendToGtm, setSendToGtm] = useState(initial?.sendToGtm ?? false);
+  const [sendToCustomCode, setSendToCustomCode] = useState(initial?.sendToCustomCode ?? false);
+  const [customCode, setCustomCode] = useState(initial?.customCode ?? "");
   const [value, setValue] = useState(initial?.value?.toString() ?? "");
   const [currency, setCurrency] = useState(initial?.currency ?? "ILS");
   const [conditionField, setConditionField] = useState(initial?.condition?.field ?? "");
@@ -72,6 +74,8 @@ export function TrackingEventDialog({
       sendToPixel,
       sendToCapi,
       sendToGtm,
+      sendToCustomCode,
+      customCode: sendToCustomCode ? customCode : undefined,
       value: value ? Number(value) : undefined,
       currency,
       condition: conditionField && conditionValue ? { field: conditionField, operator: "eq", value: conditionValue } : undefined,
@@ -153,6 +157,20 @@ export function TrackingEventDialog({
               <span>Google Tag Manager</span>
               <Switch checked={sendToGtm} onCheckedChange={setSendToGtm} />
             </div>
+            <div className="flex items-center justify-between text-sm">
+              <span>בלוק קוד מותאם אישית (JS)</span>
+              <Switch checked={sendToCustomCode} onCheckedChange={setSendToCustomCode} />
+            </div>
+            {sendToCustomCode && (
+              <textarea
+                value={customCode}
+                onChange={(e) => setCustomCode(e.target.value)}
+                dir="ltr"
+                rows={4}
+                placeholder={"window.fbq('track', 'Contact');"}
+                className="w-full rounded-md border bg-background px-2.5 py-2 text-xs font-mono outline-none focus:ring-2"
+              />
+            )}
           </div>
 
           <div className="flex items-center justify-between">

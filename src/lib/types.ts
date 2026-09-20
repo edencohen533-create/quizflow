@@ -373,6 +373,8 @@ export interface QuizTrackingEvent {
   sendToPixel: boolean;
   sendToCapi: boolean;
   sendToGtm: boolean;
+  sendToCustomCode: boolean;
+  customCode?: string;
   condition?: TrackingCondition;
   value?: number;
   currency?: string;
