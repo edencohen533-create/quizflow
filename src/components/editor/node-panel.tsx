@@ -17,6 +17,7 @@ import {
   ActionKind,
   LeadDetailsNodeData,
   MessageNodeData,
+  NameNodeData,
   QuestionAnswerType,
   QuestionNodeData,
   QuizNode,
@@ -81,6 +82,9 @@ export function NodePanel({
         )}
         {node.data.kind === "question" && (
           <QuestionForm data={node.data} onChange={onChange} />
+        )}
+        {node.data.kind === "name" && (
+          <NameForm data={node.data} onChange={onChange} />
         )}
         {node.data.kind === "lead_details" && (
           <LeadDetailsForm data={node.data} onChange={onChange} />
@@ -224,6 +228,23 @@ function QuestionForm({ data, onChange }: { data: QuestionNodeData; onChange: (d
           </Button>
         </div>
       )}
+    </>
+  );
+}
+
+function NameForm({ data, onChange }: { data: NameNodeData; onChange: (d: QuizNodeData) => void }) {
+  return (
+    <>
+      <Field label="שאלת השם">
+        <Input value={data.title} onChange={(e) => onChange({ ...data, title: e.target.value })} />
+      </Field>
+      <Field label="טקסט מציין מקום (placeholder)">
+        <Input value={data.placeholder ?? ""} onChange={(e) => onChange({ ...data, placeholder: e.target.value })} />
+      </Field>
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-muted-foreground">שדה חובה</Label>
+        <Switch checked={data.required} onCheckedChange={(v) => onChange({ ...data, required: v })} />
+      </div>
     </>
   );
 }

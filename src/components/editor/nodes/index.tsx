@@ -6,6 +6,7 @@ import {
   EndNodeData,
   LeadDetailsNodeData,
   MessageNodeData,
+  NameNodeData,
   QuestionNodeData,
   ScoreNodeData,
 } from "@/lib/types";
@@ -77,6 +78,14 @@ const ANSWER_TYPE_LABEL: Record<QuestionNodeData["answerType"], string> = {
   date: "תאריך",
 };
 
+export function NameNodeRenderer({ selected, data }: NodeProps<WithConnected<NameNodeData>>) {
+  return (
+    <BaseNode type="name" title={data.title || "שם"} selected={selected} connected={data._connected}>
+      {data.placeholder || "השם שלך"}
+    </BaseNode>
+  );
+}
+
 export function LeadDetailsNodeRenderer({ selected, data }: NodeProps<WithConnected<LeadDetailsNodeData>>) {
   const fields = [
     data.showName && "שם",
@@ -138,6 +147,7 @@ export const nodeTypes = {
   start: StartNodeRenderer,
   message: MessageNodeRenderer,
   question: QuestionNodeRenderer,
+  name: NameNodeRenderer,
   lead_details: LeadDetailsNodeRenderer,
   condition: ConditionNodeRenderer,
   score: ScoreNodeRenderer,

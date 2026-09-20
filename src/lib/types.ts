@@ -2,6 +2,7 @@ export type NodeType =
   | "start"
   | "message"
   | "question"
+  | "name"
   | "lead_details"
   | "condition"
   | "score"
@@ -48,6 +49,14 @@ export interface QuestionNodeData {
   allowOther: boolean;
   options: QuestionOption[];
   // used for non-choice answer types (text/number/rating/date) — single continuation
+  nextNodeId: string | null;
+}
+
+export interface NameNodeData {
+  kind: "name";
+  title: string;
+  placeholder?: string;
+  required: boolean;
   nextNodeId: string | null;
 }
 
@@ -115,6 +124,7 @@ export type QuizNodeData =
   | StartNodeData
   | MessageNodeData
   | QuestionNodeData
+  | NameNodeData
   | LeadDetailsNodeData
   | ConditionNodeData
   | ScoreNodeData

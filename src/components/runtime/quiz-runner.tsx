@@ -38,6 +38,8 @@ function titleForNode(node: QuizNode): string {
       return node.data.title || node.data.text || "הודעה";
     case "question":
       return node.data.title;
+    case "name":
+      return node.data.title;
     case "lead_details":
       return "פרטי יצירת קשר";
     case "end":
@@ -48,7 +50,7 @@ function titleForNode(node: QuizNode): string {
 }
 
 function totalStepsFor(quiz: Quiz): number {
-  return quiz.nodes.filter((n) => n.type === "question" || n.type === "lead_details").length;
+  return quiz.nodes.filter((n) => n.type === "question" || n.type === "name" || n.type === "lead_details").length;
 }
 
 type Entry =
@@ -359,6 +361,9 @@ function BotNodeContent({ node }: { node: QuizNode }) {
       </div>
     );
   }
+  if (node.data.kind === "name") {
+    return <p className="font-bold">{node.data.title}</p>;
+  }
   if (node.data.kind === "lead_details") {
     return <p className="font-bold">השאירו פרטים ונחזור אליכם</p>;
   }
@@ -390,6 +395,32 @@ function NodeControls({
       >
         {data.buttonLabel || "המשך"}
       </button>
+    );
+  }
+
+  if (node.data.kind === "name") {
+    const data = node.data;
+    return (
+      <div className="space-y-2">
+        <input
+          placeholder={data.placeholder || "השם שלך"}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          className="w-full rounded-lg border px-4 py-2.5 text-sm outline-none focus:ring-2"
+          style={{ borderColor: PALETTE.buttonBorder }}
+        />
+        <button
+          className="w-full rounded-lg py-3 text-sm font-semibold text-white disabled:opacity-50"
+          style={{ background: PALETTE.buttonText }}
+          disabled={data.required && !text.trim()}
+          onClick={() => {
+            onLeadInfoChange({ name: text });
+            onComplete(text || "—", null, { nodeId: node.id, questionTitle: data.title, answerLabel: text || "—", score: 0 });
+          }}
+        >
+          המשך
+        </button>
+      </div>
     );
   }
 
