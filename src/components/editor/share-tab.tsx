@@ -46,7 +46,22 @@ export function ShareTab({ quiz }: { quiz: Quiz }) {
   const [advanced, setAdvanced] = useState(false);
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const publicUrl = `${origin}/q/${quiz.slug}`;
-  const iframeCode = `<iframe src="${publicUrl}" width="100%" height="700" style="border:0;border-radius:16px;" title="${quiz.name}"></iframe>`;
+  const fullPageCode = `<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>${quiz.name}</title>
+  </head>
+  <body>
+    <script src="${origin}/embed.js"></script>
+    <script>
+      QuizFlow.init({
+        quiz: "${quiz.slug}",
+        trigger: "fullpage"
+      });
+    </script>
+  </body>
+</html>`;
 
   const quickPopupCode = `<script src="${origin}/embed.js" data-quiz="${quiz.slug}" data-trigger="${trigger}"${
     trigger === "delay" ? ` data-delay="${delaySeconds}"` : ""
@@ -82,8 +97,13 @@ export function ShareTab({ quiz }: { quiz: Quiz }) {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">הטמעה מלאה בעמוד (iframe)</CardTitle></CardHeader>
-        <CardContent><CopyBlock value={iframeCode} /></CardContent>
+        <CardHeader><CardTitle className="text-base">הטמעה מלאה בעמוד</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            עמוד HTML עצמאי שממלא את כל המסך בשאלון (למשל כדף נחיתה בפני עצמו).
+          </p>
+          <CopyBlock value={fullPageCode} />
+        </CardContent>
       </Card>
 
       <Card>

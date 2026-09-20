@@ -8,7 +8,7 @@
  *   <script>
  *     QuizFlow.init({
  *       quiz: "SLUG",
- *       trigger: "delay",   // "button" | "delay" | "exit" | "inline"
+ *       trigger: "delay",   // "button" | "delay" | "exit" | "inline" | "fullpage"
  *       delay: 5,           // seconds, used when trigger === "delay"
  *       buttonSelector: "#my-cta",   // optional: bind to an existing button instead of the floating bubble
  *       container: "#quiz-container", // required when trigger === "inline"
@@ -45,7 +45,8 @@
       ".qf-overlay.qf-open .qf-modal{transform:translateY(0)}" +
       ".qf-modal iframe{width:100%;height:100%;border:0;display:block}" +
       ".qf-close{position:absolute;top:10px;inset-inline-end:10px;width:32px;height:32px;border-radius:999px;background:rgba(15,23,42,.55);color:#fff;border:none;cursor:pointer;font-size:18px;line-height:1;z-index:1}" +
-      ".qf-inline-frame{width:100%;height:100%;min-height:640px;border:0;display:block;border-radius:16px}";
+      ".qf-inline-frame{width:100%;height:100%;min-height:640px;border:0;display:block;border-radius:16px}" +
+      ".qf-fullpage-frame{position:fixed;inset:0;width:100%;height:100%;border:0;display:block;z-index:2147483000}";
     document.head.appendChild(style);
   }
 
@@ -139,6 +140,18 @@
       iframe.src = quizUrl(slug);
       iframe.title = "QuizFlow";
       container.appendChild(iframe);
+      return;
+    }
+
+    if (trigger === "fullpage") {
+      injectStyles();
+      document.documentElement.style.margin = "0";
+      document.body.style.margin = "0";
+      var fullFrame = document.createElement("iframe");
+      fullFrame.className = "qf-fullpage-frame";
+      fullFrame.src = quizUrl(slug);
+      fullFrame.title = "QuizFlow";
+      document.body.appendChild(fullFrame);
       return;
     }
 
