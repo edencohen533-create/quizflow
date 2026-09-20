@@ -96,7 +96,6 @@ export type ActionKind =
   | "webhook"
   | "crm"
   | "email"
-  | "google_sheets"
   | "redirect"
   | "meta_pixel"
   | "tiktok_pixel";

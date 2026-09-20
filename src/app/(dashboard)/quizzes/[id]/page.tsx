@@ -160,7 +160,7 @@ export default function QuizEditorPage({ params }: { params: Promise<{ id: strin
           <TrackingTab quiz={quiz} />
         </TabsContent>
         <TabsContent value="integrations" className="flex-1 min-h-0 m-0 overflow-auto">
-          <ComingSoonTab title="אינטגרציות" description="חיבור Webhook, Google Sheets, Zapier ופיקסלים לשאלון הזה יתווסף בשלב הבא. בינתיים אפשר להגדיר Webhook כללי בעמוד האינטגרציות הראשי." />
+          <ComingSoonTab title="אינטגרציות" description="חיבור Webhook, Zapier ופיקסלים לשאלון הזה יתווסף בשלב הבא. בינתיים אפשר להגדיר Webhook כללי בעמוד האינטגרציות הראשי." />
         </TabsContent>
         <TabsContent value="analytics" className="flex-1 min-h-0 m-0 overflow-auto">
           <AnalyticsTab quizId={quiz.id} />
