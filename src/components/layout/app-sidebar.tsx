@@ -68,12 +68,12 @@ export function AppSidebar() {
   return (
     <aside className="hidden md:flex w-64 shrink-0 flex-col justify-between bg-sidebar text-sidebar-foreground border-s border-sidebar-border h-screen sticky top-0">
       <div>
-        <div className="flex items-center gap-2 px-5 h-16 border-b border-sidebar-border">
+        <Link href="/" className="flex items-center gap-2 px-5 h-16 border-b border-sidebar-border">
           <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Sparkles className="size-4" />
           </div>
           <span className="font-bold text-lg tracking-tight">QuizFlow</span>
-        </div>
+        </Link>
         <nav className="flex flex-col gap-1 p-3">
           {NAV_ITEMS.map((item) => {
             const active =
