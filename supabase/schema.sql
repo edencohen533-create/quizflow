@@ -657,6 +657,8 @@ create table if not exists public.quiz_tracking_events (
   send_to_pixel boolean not null default true,
   send_to_capi boolean not null default true,
   send_to_gtm boolean not null default false,
+  send_to_custom_code boolean not null default false,
+  custom_code text,
   condition_field text,
   condition_operator text check (condition_operator in ('eq', 'neq', 'gt', 'gte', 'lt', 'lte')),
   condition_value text,
@@ -804,3 +806,12 @@ begin
     alter publication supabase_realtime add table public.quiz_sessions;
   end if;
 end $$;
+
+-- ============================================================
+-- 10. Custom-code tracking events (run arbitrary JS on trigger, e.g.
+--     window.fbq('track','Contact')), added to an already-deployed
+--     quiz_tracking_events table.
+-- ============================================================
+
+alter table public.quiz_tracking_events add column if not exists send_to_custom_code boolean not null default false;
+alter table public.quiz_tracking_events add column if not exists custom_code text;

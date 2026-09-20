@@ -27,6 +27,8 @@ interface EventRow {
   send_to_pixel: boolean;
   send_to_capi: boolean;
   send_to_gtm: boolean;
+  send_to_custom_code: boolean;
+  custom_code: string | null;
   condition_field: string | null;
   condition_operator: TrackingCondition["operator"] | null;
   condition_value: string | null;
@@ -59,6 +61,8 @@ function rowToEvent(row: EventRow): QuizTrackingEvent {
     sendToPixel: row.send_to_pixel,
     sendToCapi: row.send_to_capi,
     sendToGtm: row.send_to_gtm,
+    sendToCustomCode: row.send_to_custom_code,
+    customCode: row.custom_code ?? undefined,
     condition:
       row.condition_field && row.condition_operator && row.condition_value != null
         ? { field: row.condition_field, operator: row.condition_operator, value: row.condition_value }
@@ -110,6 +114,8 @@ export interface TrackingEventInput {
   sendToPixel: boolean;
   sendToCapi: boolean;
   sendToGtm: boolean;
+  sendToCustomCode: boolean;
+  customCode?: string;
   condition?: TrackingCondition;
   value?: number;
   currency?: string;
@@ -127,6 +133,8 @@ export async function createTrackingEvent(supabase: SupabaseClient, quizId: stri
       send_to_pixel: input.sendToPixel,
       send_to_capi: input.sendToCapi,
       send_to_gtm: input.sendToGtm,
+      send_to_custom_code: input.sendToCustomCode,
+      custom_code: input.customCode ?? null,
       condition_field: input.condition?.field ?? null,
       condition_operator: input.condition?.operator ?? null,
       condition_value: input.condition?.value ?? null,
@@ -148,6 +156,8 @@ export async function updateTrackingEvent(supabase: SupabaseClient, id: string, 
   if (input.sendToPixel !== undefined) row.send_to_pixel = input.sendToPixel;
   if (input.sendToCapi !== undefined) row.send_to_capi = input.sendToCapi;
   if (input.sendToGtm !== undefined) row.send_to_gtm = input.sendToGtm;
+  if (input.sendToCustomCode !== undefined) row.send_to_custom_code = input.sendToCustomCode;
+  if (input.customCode !== undefined) row.custom_code = input.customCode;
   if (input.condition !== undefined) {
     row.condition_field = input.condition?.field ?? null;
     row.condition_operator = input.condition?.operator ?? null;
@@ -172,6 +182,8 @@ export async function duplicateTrackingEvent(supabase: SupabaseClient, quizId: s
     sendToPixel: event.sendToPixel,
     sendToCapi: event.sendToCapi,
     sendToGtm: event.sendToGtm,
+    sendToCustomCode: event.sendToCustomCode,
+    customCode: event.customCode,
     condition: event.condition,
     value: event.value,
     currency: event.currency,

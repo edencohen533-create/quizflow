@@ -123,6 +123,14 @@ export function fireTrackingEvent(def: QuizTrackingEvent, ctx: FireContext) {
     pushDataLayer(eventName, { value: def.value, currency: def.currency, event_id: eventId });
   }
 
+  if (def.sendToCustomCode && def.customCode) {
+    try {
+      new Function(def.customCode)();
+    } catch (err) {
+      console.error("QuizFlow custom tracking code failed:", err);
+    }
+  }
+
   if (def.sendToCapi && ctx.settings.metaHasToken) {
     fetch("/api/tracking/fire-capi", {
       method: "POST",
