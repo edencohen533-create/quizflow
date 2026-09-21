@@ -10,8 +10,7 @@ const nodes: QuizNode[] = [
   n("start-1", "start", 0, 0, { kind: "start" }),
   n("msg-1", "message", 320, 0, {
     kind: "message",
-    title: "בואו נבדוק את ההתאמה שלך",
-    text: "כמה שאלות קצרות שייקחו לך פחות מדקה, ויעזרו לנו להבין את הצרכים הפיננסיים שלך.",
+    text: "בואו נבדוק את ההתאמה שלך\n\nכמה שאלות קצרות שייקחו לך פחות מדקה, ויעזרו לנו להבין את הצרכים הפיננסיים שלך.",
     buttonLabel: "בואו נתחיל",
     autoAdvance: false,
     autoAdvanceSeconds: 3,

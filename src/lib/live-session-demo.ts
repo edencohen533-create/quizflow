@@ -97,7 +97,7 @@ async function writeDemoStep(supabase: SupabaseClient, workspaceId: string, walk
   const stepIndex = walk.steps.slice(0, walk.index + 1).filter((s) => s.node.type === "question" || s.node.type === "lead_details").length;
 
   let title = "";
-  if (step.node.data.kind === "message") title = step.node.data.title || step.node.data.text || "הודעה";
+  if (step.node.data.kind === "message") title = step.node.data.text || "הודעה";
   else if (step.node.data.kind === "question") title = step.node.data.title;
   else if (step.node.data.kind === "lead_details") title = "פרטי יצירת קשר";
   else if (step.node.data.kind === "end") title = "סיום";
