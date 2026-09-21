@@ -18,8 +18,8 @@ function buildPreviewPalette(theme: QuizTheme) {
     page: theme.backgroundColor || "#F7F6EC",
     bubbleBot: "#FFFFFF",
     bubbleUser: "#F1EFF2",
-    buttonBorder: accent,
-    buttonText: accent,
+    buttonBorder: theme.buttonBorderColor || accent,
+    buttonText: theme.buttonTextColor || accent,
     text: theme.textColor || "#535C82",
     muted: theme.mutedTextColor || "#9AA0BE",
   };
@@ -113,9 +113,19 @@ export function DesignTab({ quiz, onThemeChange }: { quiz: Quiz; onThemeChange?:
                 value={theme.mutedTextColor ?? "#9AA0BE"}
                 onChange={(v) => patch({ mutedTextColor: v })}
               />
+              <ColorField
+                label="צבע מסגרת לכפתורים"
+                value={theme.buttonBorderColor || theme.primaryColor}
+                onChange={(v) => patch({ buttonBorderColor: v })}
+              />
+              <ColorField
+                label="צבע טקסט בכפתורים"
+                value={theme.buttonTextColor || theme.primaryColor}
+                onChange={(v) => patch({ buttonTextColor: v })}
+              />
             </div>
             <p className="text-xs text-muted-foreground">
-              &quot;צבע ראשי&quot; משמש גם לבועת ההטמעה הצפה (בטאב &quot;שיתוף&quot;) וגם לכפתורי המענה בצ&apos;אט עצמו.
+              &quot;צבע ראשי&quot; משמש כברירת מחדל למסגרת ולטקסט של הכפתורים (וגם לבועת ההטמעה הצפה בטאב &quot;שיתוף&quot;) — אלא אם מגדירים להם צבעים נפרדים למעלה.
             </p>
           </CardContent>
         </Card>
