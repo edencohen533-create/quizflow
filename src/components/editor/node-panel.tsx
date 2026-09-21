@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Trash2, Copy, X, GripVertical } from "lucide-react";
+import { useRef, useState } from "react";
+import { Plus, Trash2, Copy, X, GripVertical, Bold, Link as LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,6 +65,53 @@ function ParamChips({ params, onInsert }: { params: AvailableParam[]; onInsert: 
           {`{{${p.key}}}`}
         </button>
       ))}
+    </div>
+  );
+}
+
+type RichTextField = HTMLTextAreaElement | HTMLInputElement;
+
+// Wraps or wraps-with-link the current selection in a text field with the
+// same lightweight **bold**/[label](url) markup renderRichText() parses on
+// the live bot, so nothing is bold unless the author explicitly marks it.
+function RichTextToolbar({
+  fieldRef,
+  value,
+  onChange,
+}: {
+  fieldRef: React.RefObject<RichTextField | null>;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  function selection() {
+    const el = fieldRef.current;
+    const start = el?.selectionStart ?? value.length;
+    const end = el?.selectionEnd ?? value.length;
+    return { start, end };
+  }
+
+  function toggleBold() {
+    const { start, end } = selection();
+    const selected = value.slice(start, end) || "טקסט מודגש";
+    onChange(value.slice(0, start) + `**${selected}**` + value.slice(end));
+  }
+
+  function addLink() {
+    const url = window.prompt("קישור (URL):", "https://");
+    if (!url) return;
+    const { start, end } = selection();
+    const selected = value.slice(start, end) || "קישור";
+    onChange(value.slice(0, start) + `[${selected}](${url})` + value.slice(end));
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <Button type="button" variant="ghost" size="icon" className="size-6" onClick={toggleBold} title="הדגשת טקסט">
+        <Bold className="size-3" />
+      </Button>
+      <Button type="button" variant="ghost" size="icon" className="size-6" onClick={addLink} title="הוסף קישור">
+        <LinkIcon className="size-3" />
+      </Button>
     </div>
   );
 }
@@ -147,23 +194,34 @@ export function NodePanel({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, action, children }: { label: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-muted-foreground">{label}</Label>
+        {action}
+      </div>
       {children}
     </div>
   );
 }
 
 function MessageForm({ data, onChange, availableParams }: { data: MessageNodeData; onChange: (d: QuizNodeData) => void; availableParams: AvailableParam[] }) {
+  const titleRef = useRef<HTMLInputElement>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
   return (
     <>
-      <Field label="כותרת">
-        <Input value={data.title} onChange={(e) => onChange({ ...data, title: e.target.value })} />
+      <Field
+        label="כותרת"
+        action={<RichTextToolbar fieldRef={titleRef} value={data.title} onChange={(v) => onChange({ ...data, title: v })} />}
+      >
+        <Input ref={titleRef} value={data.title} onChange={(e) => onChange({ ...data, title: e.target.value })} />
       </Field>
-      <Field label="טקסט">
-        <Textarea rows={4} value={data.text} onChange={(e) => onChange({ ...data, text: e.target.value })} />
+      <Field
+        label="טקסט"
+        action={<RichTextToolbar fieldRef={textRef} value={data.text} onChange={(v) => onChange({ ...data, text: v })} />}
+      >
+        <Textarea ref={textRef} rows={4} value={data.text} onChange={(e) => onChange({ ...data, text: e.target.value })} />
         <ParamChips params={availableParams} onInsert={(token) => onChange({ ...data, text: appendToken(data.text, token) })} />
       </Field>
       <Field label="תמונה (אופציונלי)">
@@ -208,6 +266,7 @@ function QuestionContentBlocks({ data, onChange, availableParams }: { data: Ques
   const imageFirst = data.imagePosition !== "below";
   const blocks: Array<"image" | "text"> = imageFirst ? ["image", "text"] : ["text", "image"];
   const [draggingBlock, setDraggingBlock] = useState<"image" | "text" | null>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
 
   function handleDrop(target: "image" | "text") {
     if (draggingBlock && draggingBlock !== target) {
@@ -227,15 +286,21 @@ function QuestionContentBlocks({ data, onChange, availableParams }: { data: Ques
           onDrop={() => handleDrop(block)}
           className="rounded-lg border border-dashed p-2 space-y-1.5"
         >
-          <div className="flex items-center gap-1 cursor-grab text-muted-foreground active:cursor-grabbing">
-            <GripVertical className="size-3.5" />
-            <span className="text-xs">{block === "image" ? "תמונה (אופציונלי)" : "השאלה"}</span>
+          <div className="flex items-center justify-between gap-1">
+            <div className="flex items-center gap-1 cursor-grab text-muted-foreground active:cursor-grabbing">
+              <GripVertical className="size-3.5" />
+              <span className="text-xs">{block === "image" ? "תמונה (אופציונלי)" : "השאלה"}</span>
+            </div>
+            {block === "text" && (
+              <RichTextToolbar fieldRef={titleRef} value={data.title} onChange={(v) => onChange({ ...data, title: v })} />
+            )}
           </div>
           {block === "image" ? (
             <ImageUploadField value={data.imageUrl ?? ""} onChange={(url) => onChange({ ...data, imageUrl: url })} />
           ) : (
             <>
               <Textarea
+                ref={titleRef}
                 rows={5}
                 value={data.title}
                 onChange={(e) => onChange({ ...data, title: e.target.value })}
@@ -519,13 +584,21 @@ function ActionForm({ data, onChange }: { data: ActionNodeData; onChange: (d: Qu
 }
 
 function EndForm({ data, onChange, availableParams }: { data: EndNodeData; onChange: (d: QuizNodeData) => void; availableParams: AvailableParam[] }) {
+  const titleRef = useRef<HTMLInputElement>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
   return (
     <>
-      <Field label="כותרת">
-        <Input value={data.title} onChange={(e) => onChange({ ...data, title: e.target.value })} />
+      <Field
+        label="כותרת"
+        action={<RichTextToolbar fieldRef={titleRef} value={data.title} onChange={(v) => onChange({ ...data, title: v })} />}
+      >
+        <Input ref={titleRef} value={data.title} onChange={(e) => onChange({ ...data, title: e.target.value })} />
       </Field>
-      <Field label="טקסט סיום">
-        <Textarea rows={3} value={data.text} onChange={(e) => onChange({ ...data, text: e.target.value })} />
+      <Field
+        label="טקסט סיום"
+        action={<RichTextToolbar fieldRef={textRef} value={data.text} onChange={(v) => onChange({ ...data, text: v })} />}
+      >
+        <Textarea ref={textRef} rows={3} value={data.text} onChange={(e) => onChange({ ...data, text: e.target.value })} />
         <ParamChips params={availableParams} onInsert={(token) => onChange({ ...data, text: appendToken(data.text, token) })} />
       </Field>
       <Field label="טקסט כפתור CTA (אופציונלי)">
