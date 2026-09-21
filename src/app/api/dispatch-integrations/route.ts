@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
 
   for (const integration of integrations ?? []) {
     if (integration.kind === "webhook" && integration.url) {
+      const extraParams: { key: string; value: string }[] = integration.extra_params ?? [];
       try {
         const res = await fetch(integration.url, {
           method: "POST",
@@ -71,6 +72,7 @@ export async function POST(req: NextRequest) {
             utmCampaign: lead.utm_campaign,
             createdAt: lead.created_at,
             data: answerData,
+            params: Object.fromEntries(extraParams.map((p) => [p.key, p.value])),
           }),
         });
         await admin

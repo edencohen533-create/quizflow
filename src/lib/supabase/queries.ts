@@ -418,6 +418,7 @@ interface IntegrationRow {
   enabled: boolean;
   url: string | null;
   secret: string | null;
+  extra_params: { key: string; value: string }[] | null;
   pixel_id: string | null;
   last_triggered_at: string | null;
   last_status: "success" | "error" | null;
@@ -435,6 +436,7 @@ function integrationRowToIntegration(row: IntegrationRow): Integration {
     enabled: row.enabled,
     url: row.url ?? undefined,
     secret: row.secret ?? undefined,
+    extraParams: row.extra_params ?? [],
     pixelId: row.pixel_id ?? undefined,
     lastTriggeredAt: row.last_triggered_at ?? undefined,
     lastStatus: row.last_status ?? undefined,
@@ -460,7 +462,7 @@ export async function addIntegration(
   supabase: SupabaseClient,
   workspaceId: string,
   quizId: string,
-  input: { kind: IntegrationKind; name: string; url?: string; secret?: string; pixelId?: string }
+  input: { kind: IntegrationKind; name: string; url?: string; secret?: string; extraParams?: { key: string; value: string }[]; pixelId?: string }
 ): Promise<Integration> {
   const { data, error } = await supabase
     .from("integrations")
@@ -471,6 +473,7 @@ export async function addIntegration(
       name: input.name,
       url: input.url ?? null,
       secret: input.secret ?? null,
+      extra_params: input.extraParams ?? [],
       pixel_id: input.pixelId ?? null,
       enabled: true,
     })
@@ -486,6 +489,7 @@ export async function updateIntegration(supabase: SupabaseClient, id: string, pa
   if (patch.pixelId !== undefined) row.pixel_id = patch.pixelId;
   if (patch.url !== undefined) row.url = patch.url;
   if (patch.secret !== undefined) row.secret = patch.secret;
+  if (patch.extraParams !== undefined) row.extra_params = patch.extraParams;
   if (patch.name !== undefined) row.name = patch.name;
   const { error } = await supabase.from("integrations").update(row).eq("id", id);
   if (error) throw error;

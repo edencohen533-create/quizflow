@@ -296,6 +296,8 @@ export interface Integration {
   // webhook
   url?: string;
   secret?: string;
+  // extra static key/value pairs sent alongside every webhook payload
+  extraParams?: { key: string; value: string }[];
   // pixels
   pixelId?: string;
   createdAt: string;

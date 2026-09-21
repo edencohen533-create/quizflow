@@ -117,7 +117,12 @@ export async function testWebhook(supabase: SupabaseClient, integration: Integra
       body: JSON.stringify({
         url: integration.url,
         secret: integration.secret,
-        payload: { test: true, message: "בדיקת חיבור מ-QuizFlow", sentAt: new Date().toISOString() },
+        payload: {
+          test: true,
+          message: "בדיקת חיבור מ-QuizFlow",
+          sentAt: new Date().toISOString(),
+          params: Object.fromEntries((integration.extraParams ?? []).map((p) => [p.key, p.value])),
+        },
       }),
     });
     const data = await res.json().catch(() => ({ ok: false }));

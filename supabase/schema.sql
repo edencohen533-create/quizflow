@@ -164,6 +164,7 @@ create table if not exists public.integrations (
   enabled boolean not null default true,
   url text,
   secret text,
+  extra_params jsonb not null default '[]'::jsonb,
   pixel_id text,
   last_triggered_at timestamptz,
   last_status text check (last_status in ('success', 'error')),
@@ -905,3 +906,11 @@ create index if not exists submission_answers_submission_id_idx on public.submis
 
 alter table public.integrations add column if not exists quiz_id uuid references public.quizzes(id) on delete cascade;
 create index if not exists integrations_quiz_id_idx on public.integrations(quiz_id);
+
+-- ============================================================
+-- 17. Webhooks can send extra static key/value parameters (e.g. a source
+--     tag or CRM field the endpoint expects) alongside the lead's data,
+--     added to an already-deployed integrations table.
+-- ============================================================
+
+alter table public.integrations add column if not exists extra_params jsonb not null default '[]'::jsonb;
