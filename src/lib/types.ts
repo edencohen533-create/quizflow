@@ -39,6 +39,10 @@ export interface MessageNodeData {
   imageUrl?: string;
   videoUrl?: string;
   buttonLabel: string;
+  // when true, the message advances on its own after autoAdvanceSeconds
+  // instead of waiting for the visitor to click the continue button
+  autoAdvance: boolean;
+  autoAdvanceSeconds: number;
   nextNodeId: string | null;
 }
 

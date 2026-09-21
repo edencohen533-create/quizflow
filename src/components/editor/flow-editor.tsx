@@ -37,7 +37,7 @@ function defaultDataFor(type: NodeType): QuizNodeData {
     case "start":
       return { kind: "start" };
     case "message":
-      return { kind: "message", title: "הודעה חדשה", text: "", buttonLabel: "המשך", nextNodeId: null };
+      return { kind: "message", title: "הודעה חדשה", text: "", buttonLabel: "המשך", autoAdvance: false, autoAdvanceSeconds: 3, nextNodeId: null };
     case "question":
       return {
         kind: "question",

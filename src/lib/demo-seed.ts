@@ -13,6 +13,8 @@ const nodes: QuizNode[] = [
     title: "בואו נבדוק את ההתאמה שלך",
     text: "כמה שאלות קצרות שייקחו לך פחות מדקה, ויעזרו לנו להבין את הצרכים הפיננסיים שלך.",
     buttonLabel: "בואו נתחיל",
+    autoAdvance: false,
+    autoAdvanceSeconds: 3,
     nextNodeId: "q-age",
   }),
   n("q-age", "question", 640, 0, {
