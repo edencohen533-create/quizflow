@@ -26,14 +26,20 @@ export function isValidIsraeliPhone(phone: string): boolean {
   return /^0(5\d|[23489]|7[0-9])\d{7}$/.test(phone.replace(/[\s-]/g, ""));
 }
 
-const AUTO_ADVANCE_TYPES = new Set(["start", "condition", "score", "action"]);
+const AUTO_ADVANCE_TYPES = new Set(["start", "condition", "ab_test", "score", "action"]);
+
+export function pickAbTestHandle(node: QuizNode): "a" | "b" {
+  const splitPercent = node.data.kind === "ab_test" ? node.data.splitPercent : 50;
+  return Math.random() * 100 < splitPercent ? "a" : "b";
+}
 
 export function resolveRenderable(quiz: Quiz, fromId: string, handle: string | null = null): QuizNode | undefined {
   let node = nextNodeFrom(quiz, fromId, handle);
   const visited = new Set<string>();
   while (node && AUTO_ADVANCE_TYPES.has(node.type) && !visited.has(node.id)) {
     visited.add(node.id);
-    node = nextNodeFrom(quiz, node.id, null);
+    const nextHandle = node.type === "ab_test" ? pickAbTestHandle(node) : null;
+    node = nextNodeFrom(quiz, node.id, nextHandle);
   }
   return node;
 }

@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  AbTestNodeData,
   ActionKind,
   LeadDetailsNodeData,
   MessageNodeData,
@@ -95,6 +96,9 @@ export function NodePanel({
         )}
         {node.data.kind === "condition" && (
           <ConditionForm data={node.data} onChange={onChange} />
+        )}
+        {node.data.kind === "ab_test" && (
+          <AbTestForm data={node.data} onChange={onChange} />
         )}
         {node.data.kind === "score" && (
           <ScoreForm data={node.data} onChange={onChange} />
@@ -338,6 +342,28 @@ function LeadDetailsForm({ data, onChange }: { data: LeadDetailsNodeData; onChan
           <Textarea rows={2} value={data.consentText} onChange={(e) => onChange({ ...data, consentText: e.target.value })} />
         </Field>
       )}
+    </>
+  );
+}
+
+function AbTestForm({ data, onChange }: { data: AbTestNodeData; onChange: (d: QuizNodeData) => void }) {
+  return (
+    <>
+      <p className="text-xs text-muted-foreground">
+        חבר את שני הפלטים (וריאנט A ווריאנט B) מהצומת בקנבס לשני בלוקים שונים כדי לבדוק איזה ניסוח עובד טוב יותר. כל משתמש מוצא אקראית לוריאנט אחד, לפי האחוז שתגדיר כאן.
+      </p>
+      <Field label="אחוז תנועה לוריאנט A">
+        <Input
+          type="number"
+          min={0}
+          max={100}
+          value={data.splitPercent}
+          onChange={(e) => onChange({ ...data, splitPercent: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })}
+        />
+      </Field>
+      <p className="text-xs text-muted-foreground">
+        וריאנט A: {data.splitPercent}% · וריאנט B: {100 - data.splitPercent}%
+      </p>
     </>
   );
 }

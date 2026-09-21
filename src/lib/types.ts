@@ -5,6 +5,7 @@ export type NodeType =
   | "name"
   | "lead_details"
   | "condition"
+  | "ab_test"
   | "score"
   | "action"
   | "end";
@@ -85,6 +86,11 @@ export interface ConditionNodeData {
   elseNodeId: string | null;
 }
 
+export interface AbTestNodeData {
+  kind: "ab_test";
+  splitPercent: number;
+}
+
 export interface ScoreNodeData {
   kind: "score";
   hotThreshold: number;
@@ -126,6 +132,7 @@ export type QuizNodeData =
   | NameNodeData
   | LeadDetailsNodeData
   | ConditionNodeData
+  | AbTestNodeData
   | ScoreNodeData
   | ActionNodeData
   | EndNodeData;

@@ -66,6 +66,8 @@ function defaultDataFor(type: NodeType): QuizNodeData {
       };
     case "condition":
       return { kind: "condition", rules: [], elseNodeId: null };
+    case "ab_test":
+      return { kind: "ab_test", splitPercent: 50 };
     case "score":
       return { kind: "score", hotThreshold: 26, warmThreshold: 16, nextNodeId: null };
     case "action":
