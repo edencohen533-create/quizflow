@@ -24,12 +24,11 @@ const RANGE_OPTIONS = [
 
 const RANGE_DAYS: Record<string, number> = { today: 1, week: 7, month: 30, "30": 30, "90": 90 };
 
-const STEP_TYPES = new Set(["question", "open_question", "name", "lead_details"]);
+const STEP_TYPES = new Set(["question", "name", "lead_details"]);
 
 function stepLabel(node: QuizNode): string {
   switch (node.data.kind) {
     case "question":
-    case "open_question":
     case "name":
       return node.data.title;
     case "lead_details":
