@@ -158,6 +158,7 @@ create index if not exists submission_answers_submission_id_idx on public.submis
 create table if not exists public.integrations (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  quiz_id uuid references public.quizzes(id) on delete cascade,
   kind text not null check (kind in ('webhook', 'meta_pixel', 'tiktok_pixel')),
   name text not null,
   enabled boolean not null default true,
@@ -171,6 +172,7 @@ create table if not exists public.integrations (
 );
 
 create index if not exists integrations_workspace_id_idx on public.integrations(workspace_id);
+create index if not exists integrations_quiz_id_idx on public.integrations(quiz_id);
 
 create table if not exists public.analytics_events (
   id uuid primary key default gen_random_uuid(),
@@ -893,3 +895,13 @@ create index if not exists lead_status_history_lead_id_idx on public.lead_status
 create index if not exists lead_notes_lead_id_idx on public.lead_notes(lead_id);
 create index if not exists quiz_submissions_lead_id_idx on public.quiz_submissions(lead_id);
 create index if not exists submission_answers_submission_id_idx on public.submission_answers(submission_id);
+
+-- ============================================================
+-- 16. Integrations move from workspace-level to per-quiz. workspace_id
+--     stays (RLS still checks it, unchanged) but each integration is now
+--     also scoped to one quiz via quiz_id, added to an already-deployed
+--     integrations table.
+-- ============================================================
+
+alter table public.integrations add column if not exists quiz_id uuid references public.quizzes(id) on delete cascade;
+create index if not exists integrations_quiz_id_idx on public.integrations(quiz_id);

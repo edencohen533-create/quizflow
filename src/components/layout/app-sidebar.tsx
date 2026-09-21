@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   ListChecks,
   Users,
-  Plug,
   Settings,
   Moon,
   Sun,
@@ -25,7 +24,6 @@ const NAV_ITEMS = [
   { href: "/quizzes", label: "שאלונים", icon: ListChecks },
   { href: "/inbox", label: "מרכז שיחות", icon: MessagesSquare },
   { href: "/leads", label: "לידים", icon: Users },
-  { href: "/integrations", label: "אינטגרציות", icon: Plug },
   { href: "/settings", label: "הגדרות", icon: Settings },
 ];
 

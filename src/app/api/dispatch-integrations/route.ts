@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   const { data: integrations } = await admin
     .from("integrations")
     .select("*")
-    .eq("workspace_id", lead.workspace_id)
+    .eq("quiz_id", lead.quiz_id)
     .eq("enabled", true);
 
   const pixels: { kind: "meta_pixel" | "tiktok_pixel"; pixelId: string }[] = [];
