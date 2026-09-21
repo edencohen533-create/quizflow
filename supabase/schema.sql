@@ -64,10 +64,13 @@ create table if not exists public.quiz_edges (
 create table if not exists public.quiz_themes (
   quiz_id uuid primary key references public.quizzes(id) on delete cascade,
   logo_url text,
+  avatar_url text,
   primary_color text not null default '#10b981',
   background_color text not null default '#f8fafc',
   text_color text not null default '#0f172a',
+  muted_text_color text,
   background_image_url text,
+  background_image_url_mobile text,
   overlay text not null default 'none' check (overlay in ('none', 'light', 'dark')),
   font_family text not null default 'assistant' check (font_family in ('assistant', 'heebo')),
   button_style text not null default 'pill' check (button_style in ('rounded', 'square', 'pill')),
@@ -851,3 +854,13 @@ create policy "quiz_media_authenticated_delete" on storage.objects
 -- ============================================================
 
 alter table public.submission_answers add column if not exists param_key text;
+
+-- ============================================================
+-- 13. Real theme customization for the live chat runtime: a custom avatar
+--     image, muted/help text color, and separate desktop/mobile background
+--     images, added to an already-deployed quiz_themes table.
+-- ============================================================
+
+alter table public.quiz_themes add column if not exists avatar_url text;
+alter table public.quiz_themes add column if not exists muted_text_color text;
+alter table public.quiz_themes add column if not exists background_image_url_mobile text;

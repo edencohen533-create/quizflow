@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
-import { Quiz, QuizNode, LeadAnswer } from "@/lib/types";
+import { Quiz, QuizNode, QuizTheme, LeadAnswer } from "@/lib/types";
 import { getStartNode, resolveRenderable, isValidIsraeliPhone } from "@/lib/quiz-runtime";
 import { createClient } from "@/lib/supabase/client";
 import { recordAnalyticsEvent, submitPublicQuizResponse } from "@/lib/supabase/queries";
@@ -14,15 +14,39 @@ import { QuizTrackingEvent, QuizTrackingSettings, QuizSessionAnswer } from "@/li
 import { Checkbox } from "@/components/ui/checkbox";
 import { SunAvatar } from "@/components/runtime/sun-avatar";
 
-const PALETTE = {
-  page: "#F7F6EC",
-  bubbleBot: "#FFFFFF",
-  bubbleUser: "#F1EFF2",
-  buttonBorder: "#F5C85E",
-  buttonText: "#EE746C",
-  text: "#535C82",
-  muted: "#9AA0BE",
-};
+type Palette = ReturnType<typeof buildPalette>;
+
+function buildPalette(theme: QuizTheme) {
+  const accent = theme.primaryColor || "#EE746C";
+  return {
+    page: theme.backgroundColor || "#F7F6EC",
+    bubbleBot: "#FFFFFF",
+    bubbleUser: "#F1EFF2",
+    buttonBorder: accent,
+    buttonText: accent,
+    text: theme.textColor || "#535C82",
+    muted: theme.mutedTextColor || "#9AA0BE",
+  };
+}
+
+function backgroundValue(imageUrl: string | undefined, fallbackColor: string) {
+  return imageUrl ? `url(${JSON.stringify(imageUrl)}) center/cover no-repeat` : fallbackColor;
+}
+
+function Avatar({ url, size = 34 }: { url?: string; size?: number }) {
+  if (url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={url}
+        alt=""
+        className="shrink-0 rounded-full object-cover shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return <SunAvatar size={size} />;
+}
 
 function timeLabel(ts: number) {
   return new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
@@ -246,6 +270,10 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
     advanceTo(node.id, handle, answer);
   }
 
+  const PALETTE = buildPalette(quiz.theme);
+  const desktopBg = backgroundValue(quiz.theme.backgroundImageUrl, PALETTE.page);
+  const mobileBg = backgroundValue(quiz.theme.backgroundImageUrlMobile, desktopBg);
+
   if (!firstNode) {
     return (
       <div className="min-h-screen flex items-center justify-center text-center p-6" style={{ background: PALETTE.page }}>
@@ -255,7 +283,8 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   }
 
   return (
-    <div dir="rtl" className="min-h-screen" style={{ background: PALETTE.page }}>
+    <div dir="rtl" className="qf-runner-bg min-h-screen">
+      <style>{`.qf-runner-bg{background:${desktopBg};}@media (max-width:767px){.qf-runner-bg{background:${mobileBg};}}`}</style>
       <div className="mx-auto max-w-2xl px-4 pb-32 pt-6 sm:px-6">
         <div className="mb-6 flex items-center justify-center rounded-[28px] bg-white py-8 shadow-sm">
           {quiz.theme.logoUrl ? (
@@ -290,7 +319,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
                     <span className="size-2 animate-bounce rounded-full bg-current [animation-delay:0.15s]" style={{ color: PALETTE.muted }} />
                     <span className="size-2 animate-bounce rounded-full bg-current [animation-delay:0.3s]" style={{ color: PALETTE.muted }} />
                   </div>
-                  <SunAvatar />
+                  <Avatar url={quiz.theme.avatarUrl} />
                 </div>
               );
             }
@@ -298,7 +327,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
             if (entry.kind === "result") {
               const node = quiz.nodes.find((n) => n.id === entry.nodeId);
               if (!node || node.data.kind !== "end") return null;
-              return <ResultCard key={entry.id} data={node.data} />;
+              return <ResultCard key={entry.id} data={node.data} palette={PALETTE} avatarUrl={quiz.theme.avatarUrl} />;
             }
 
             const node = quiz.nodes.find((n) => n.id === entry.nodeId);
@@ -317,6 +346,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
                       <div className="mt-4">
                         <NodeControls
                           node={node}
+                          palette={PALETTE}
                           leadInfo={leadInfo}
                           onLeadInfoChange={(patch) => setLeadInfo((s) => ({ ...s, ...patch }))}
                           onComplete={(text, handle, answer) => handleComplete(node, text, handle, answer)}
@@ -324,7 +354,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
                       </div>
                     )}
                   </div>
-                  <SunAvatar />
+                  <Avatar url={quiz.theme.avatarUrl} />
                 </div>
                 <span className="px-1 text-xs" style={{ color: PALETTE.muted }}>{timeLabel(entry.ts)}</span>
               </div>
@@ -374,15 +404,18 @@ function BotNodeContent({ node }: { node: QuizNode }) {
 
 function NodeControls({
   node,
+  palette,
   leadInfo,
   onLeadInfoChange,
   onComplete,
 }: {
   node: QuizNode;
+  palette: Palette;
   leadInfo: LeadInfoState;
   onLeadInfoChange: (patch: Partial<LeadInfoState>) => void;
   onComplete: (userText: string, handle: string | null, answer?: LeadAnswer) => void;
 }) {
+  const PALETTE = palette;
   const [text, setText] = useState("");
   const [multi, setMulti] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -667,7 +700,16 @@ function NodeControls({
   return null;
 }
 
-function ResultCard({ data }: { data: Extract<QuizNode["data"], { kind: "end" }> }) {
+function ResultCard({
+  data,
+  palette,
+  avatarUrl,
+}: {
+  data: Extract<QuizNode["data"], { kind: "end" }>;
+  palette: Palette;
+  avatarUrl?: string;
+}) {
+  const PALETTE = palette;
   const shouldRedirect = !!(data.redirectEnabled && data.redirectUrl);
   const [secondsLeft, setSecondsLeft] = useState(data.redirectDelaySeconds ?? 3);
 
@@ -688,7 +730,7 @@ function ResultCard({ data }: { data: Extract<QuizNode["data"], { kind: "end" }>
         style={{ borderColor: PALETTE.buttonBorder, color: PALETTE.text }}
       >
         <div className="mb-3 flex justify-center">
-          <SunAvatar size={48} />
+          <Avatar url={avatarUrl} size={48} />
         </div>
         <h2 className="text-xl font-bold">{data.title}</h2>
         <p className="mt-2 leading-relaxed">{data.text}</p>
