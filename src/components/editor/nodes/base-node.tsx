@@ -31,7 +31,7 @@ export function BaseNode({
       {showTarget && (
         <Handle
           type="target"
-          position={Position.Top}
+          position={Position.Left}
           className="!size-2.5 !bg-muted-foreground/50 !border-2 !border-card"
         />
       )}
@@ -48,7 +48,7 @@ export function BaseNode({
       {showSource && (
         <Handle
           type="source"
-          position={Position.Bottom}
+          position={Position.Right}
           className="!size-2.5 !bg-primary !border-2 !border-card"
         />
       )}

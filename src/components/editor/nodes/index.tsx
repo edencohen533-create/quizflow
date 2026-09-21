@@ -47,7 +47,7 @@ export function QuestionNodeRenderer({ selected, data }: NodeProps<WithConnected
         selected ? "border-primary ring-2 ring-primary/30" : "border-border"
       }`}
     >
-      <Handle type="target" position={Position.Top} className="!size-2.5 !bg-muted-foreground/50 !border-2 !border-card" />
+      <Handle type="target" position={Position.Left} className="!size-2.5 !bg-muted-foreground/50 !border-2 !border-card" />
       <div className="flex items-center gap-2 border-b px-3 py-2">
         <span className="flex size-6 items-center justify-center rounded-md text-violet-600 bg-violet-500/10">?</span>
         <span className="text-xs font-semibold flex-1 truncate">{data.title || "שאלה חדשה"}</span>
@@ -70,7 +70,7 @@ export function QuestionNodeRenderer({ selected, data }: NodeProps<WithConnected
         ) : (
           <div className="px-3 py-2 text-xs text-muted-foreground">
             תשובה חופשית ({ANSWER_TYPE_LABEL[data.answerType]})
-            <Handle type="source" position={Position.Bottom} className="!size-2.5 !bg-primary !border-2 !border-card" />
+            <Handle type="source" position={Position.Right} className="!size-2.5 !bg-primary !border-2 !border-card" />
           </div>
         )}
       </div>
@@ -122,7 +122,7 @@ export function AbTestNodeRenderer({ selected, data }: NodeProps<WithConnected<A
         selected ? "border-primary ring-2 ring-primary/30" : "border-border"
       }`}
     >
-      <Handle type="target" position={Position.Top} className="!size-2.5 !bg-muted-foreground/50 !border-2 !border-card" />
+      <Handle type="target" position={Position.Left} className="!size-2.5 !bg-muted-foreground/50 !border-2 !border-card" />
       <div className="flex items-center gap-2 border-b px-3 py-2">
         <span className="flex size-6 items-center justify-center rounded-md text-[10px] font-bold text-cyan-600 bg-cyan-500/10">
           A/B
