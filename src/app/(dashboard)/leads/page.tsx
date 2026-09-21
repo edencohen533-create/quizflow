@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, Search, Loader2 } from "lucide-react";
+import { Download, Search, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { LeadStatusBadge, CategoryBadge } from "@/components/shared/status-badges";
 import { LeadDrawer } from "@/components/leads/lead-drawer";
 import { createClient } from "@/lib/supabase/client";
-import { listLeads } from "@/lib/supabase/queries";
+import { deleteLead, listLeads } from "@/lib/supabase/queries";
 import { useWorkspaceId } from "@/components/layout/workspace-provider";
 import { LEAD_STATUS_LABELS, Lead, LeadStatus } from "@/lib/types";
 
@@ -58,6 +58,13 @@ export default function LeadsPage() {
     setLeads(data);
     setLoading(false);
   }, [supabase, workspaceId]);
+
+  async function handleDelete(lead: Lead) {
+    if (!window.confirm(`למחוק את הליד "${lead.name}"? הפעולה בלתי הפיכה.`)) return;
+    setLeads((ls) => ls.filter((l) => l.id !== lead.id));
+    if (selected?.id === lead.id) setSelected(null);
+    await deleteLead(supabase, lead.id);
+  }
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial client-side data fetch on mount
@@ -126,6 +133,7 @@ export default function LeadsPage() {
                 <TableHead>שם המודעה</TableHead>
                 <TableHead>תאריך מילוי</TableHead>
                 <TableHead>נציג</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -144,6 +152,19 @@ export default function LeadsPage() {
                   <TableCell className="text-muted-foreground text-sm">{lead.utmContent ?? "—"}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">{new Date(lead.createdAt).toLocaleDateString("he-IL")}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">{lead.assignedTo ?? "—"}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(lead);
+                      }}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
