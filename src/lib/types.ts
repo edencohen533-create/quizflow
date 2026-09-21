@@ -172,10 +172,13 @@ export type QuizStatus = "draft" | "active" | "paused";
 
 export interface QuizTheme {
   logoUrl?: string;
+  avatarUrl?: string;
   primaryColor: string;
   backgroundColor: string;
   textColor: string;
+  mutedTextColor?: string;
   backgroundImageUrl?: string;
+  backgroundImageUrlMobile?: string;
   overlay: "none" | "light" | "dark";
   fontFamily: "assistant" | "heebo";
   buttonStyle: "rounded" | "square" | "pill";

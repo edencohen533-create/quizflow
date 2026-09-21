@@ -44,10 +44,13 @@ export interface QuizEdgeRow {
 export interface QuizThemeRow {
   quiz_id: string;
   logo_url: string | null;
+  avatar_url: string | null;
   primary_color: string;
   background_color: string;
   text_color: string;
+  muted_text_color: string | null;
   background_image_url: string | null;
+  background_image_url_mobile: string | null;
   overlay: "none" | "light" | "dark";
   font_family: "assistant" | "heebo";
   button_style: "rounded" | "square" | "pill";
@@ -78,10 +81,13 @@ export interface LeadRow {
 export function themeRowToTheme(row: QuizThemeRow): QuizTheme {
   return {
     logoUrl: row.logo_url ?? undefined,
+    avatarUrl: row.avatar_url ?? undefined,
     primaryColor: row.primary_color,
     backgroundColor: row.background_color,
     textColor: row.text_color,
+    mutedTextColor: row.muted_text_color ?? undefined,
     backgroundImageUrl: row.background_image_url ?? undefined,
+    backgroundImageUrlMobile: row.background_image_url_mobile ?? undefined,
     overlay: row.overlay,
     fontFamily: row.font_family,
     buttonStyle: row.button_style,
@@ -96,10 +102,13 @@ export function themeToRow(quizId: string, theme: QuizTheme): QuizThemeRow {
   return {
     quiz_id: quizId,
     logo_url: theme.logoUrl ?? null,
+    avatar_url: theme.avatarUrl ?? null,
     primary_color: theme.primaryColor,
     background_color: theme.backgroundColor,
     text_color: theme.textColor,
+    muted_text_color: theme.mutedTextColor ?? null,
     background_image_url: theme.backgroundImageUrl ?? null,
+    background_image_url_mobile: theme.backgroundImageUrlMobile ?? null,
     overlay: theme.overlay,
     font_family: theme.fontFamily,
     button_style: theme.buttonStyle,
