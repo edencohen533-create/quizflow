@@ -239,7 +239,13 @@ function FlowEditorInner({
   const addNode = useCallback(
     (type: NodeType) => {
       pushHistory();
-      const position = screenToFlowPosition({ x: window.innerWidth / 2 - 100, y: 160 });
+      const rightmost = nodes.reduce<{ x: number; y: number } | null>(
+        (max, n) => (!max || n.position.x > max.x ? n.position : max),
+        null
+      );
+      const position = rightmost
+        ? { x: rightmost.x + 320, y: rightmost.y }
+        : screenToFlowPosition({ x: window.innerWidth / 2 - 100, y: 160 });
       const newNode: Node = {
         id: uid(type),
         type,
@@ -252,7 +258,7 @@ function FlowEditorInner({
         return next;
       });
     },
-    [edges, pushHistory, screenToFlowPosition, scheduleSave, setNodes]
+    [edges, nodes, pushHistory, screenToFlowPosition, scheduleSave, setNodes]
   );
 
   const selectedNode = useMemo(() => {
