@@ -136,7 +136,8 @@ create table if not exists public.submission_answers (
   node_id text not null,
   question_title text,
   answer_label text,
-  score integer not null default 0
+  score integer not null default 0,
+  param_key text
 );
 
 -- ============================================================
@@ -843,3 +844,10 @@ create policy "quiz_media_authenticated_update" on storage.objects
 drop policy if exists "quiz_media_authenticated_delete" on storage.objects;
 create policy "quiz_media_authenticated_delete" on storage.objects
   for delete using (bucket_id = 'quiz-media' and auth.role() = 'authenticated');
+
+-- ============================================================
+-- 12. Per-answer webhook parameter key, so a webhook payload can key each
+--     answer by a custom name (e.g. "age") instead of the raw node id.
+-- ============================================================
+
+alter table public.submission_answers add column if not exists param_key text;

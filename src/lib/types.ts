@@ -51,6 +51,8 @@ export interface QuestionNodeData {
   options: QuestionOption[];
   // used for non-choice answer types (text/number/rating/date) — single continuation
   nextNodeId: string | null;
+  // JSON key this answer is sent under to webhooks (e.g. "age"); falls back to the node id when unset
+  paramKey?: string;
 }
 
 export interface NameNodeData {
@@ -59,6 +61,8 @@ export interface NameNodeData {
   placeholder?: string;
   required: boolean;
   nextNodeId: string | null;
+  // JSON key this answer is sent under to webhooks (e.g. "full_name"); falls back to the node id when unset
+  paramKey?: string;
 }
 
 export interface LeadDetailsNodeData {
@@ -239,6 +243,7 @@ export interface LeadAnswer {
   questionTitle: string;
   answerLabel: string;
   score: number;
+  paramKey?: string;
 }
 
 export interface LeadNote {

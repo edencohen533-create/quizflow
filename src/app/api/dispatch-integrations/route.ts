@@ -25,6 +25,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "lead not found" }, { status: 404 });
   }
 
+  const { data: submission } = await admin
+    .from("quiz_submissions")
+    .select("id")
+    .eq("lead_id", lead.id)
+    .maybeSingle();
+
+  const { data: answerRows } = submission
+    ? await admin.from("submission_answers").select("node_id, question_title, answer_label, param_key").eq("submission_id", submission.id)
+    : { data: [] as { node_id: string; question_title: string | null; answer_label: string | null; param_key: string | null }[] };
+
+  const answerData: Record<string, string | null> = {};
+  for (const a of answerRows ?? []) {
+    answerData[a.param_key || a.node_id] = a.answer_label;
+  }
+
   const { data: integrations } = await admin
     .from("integrations")
     .select("*")
@@ -55,6 +70,7 @@ export async function POST(req: NextRequest) {
             utmMedium: lead.utm_medium,
             utmCampaign: lead.utm_campaign,
             createdAt: lead.created_at,
+            data: answerData,
           }),
         });
         await admin
