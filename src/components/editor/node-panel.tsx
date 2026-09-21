@@ -193,11 +193,11 @@ function QuestionForm({ data, onChange }: { data: QuestionNodeData; onChange: (d
 
   return (
     <>
-      <Field label="כותרת השאלה">
+      <Field label="השאלה">
         <Input value={data.title} onChange={(e) => onChange({ ...data, title: e.target.value })} />
       </Field>
-      <Field label="תיאור (אופציונלי)">
-        <Textarea rows={2} value={data.description ?? ""} onChange={(e) => onChange({ ...data, description: e.target.value })} />
+      <Field label="תמונה (אופציונלי)">
+        <ImageUploadField value={data.imageUrl ?? ""} onChange={(url) => onChange({ ...data, imageUrl: url })} />
       </Field>
       <Field label="סוג תשובה">
         <Select

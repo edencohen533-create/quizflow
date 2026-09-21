@@ -386,7 +386,18 @@ function BotNodeContent({ node }: { node: QuizNode }) {
       </div>
     );
   }
-  if (node.data.kind === "question" || node.data.kind === "open_question") {
+  if (node.data.kind === "question") {
+    return (
+      <div className="space-y-2">
+        {node.data.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={node.data.imageUrl} alt="" className="w-full rounded-xl object-cover" />
+        )}
+        <p className="font-bold">{node.data.title}</p>
+      </div>
+    );
+  }
+  if (node.data.kind === "open_question") {
     return (
       <div>
         <p className="font-bold">{node.data.title}</p>
