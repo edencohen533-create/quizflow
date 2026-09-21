@@ -41,6 +41,7 @@ export function OpenQuestionNodeRenderer({ selected, data }: NodeProps<WithConne
 
 export function QuestionNodeRenderer({ selected, data }: NodeProps<WithConnected<QuestionNodeData>>) {
   const isChoice = data.answerType === "single_choice" || data.answerType === "multi_choice";
+  const combined = isChoice && data.combineAnswers;
   return (
     <div
       className={`w-72 rounded-xl border bg-card shadow-sm ${
@@ -48,23 +49,33 @@ export function QuestionNodeRenderer({ selected, data }: NodeProps<WithConnected
       }`}
     >
       <Handle type="target" position={Position.Left} className="!size-2.5 !bg-muted-foreground/50 !border-2 !border-card" />
-      <div className="flex items-center gap-2 border-b px-3 py-2">
+      <div className="relative flex items-center gap-2 border-b px-3 py-2">
         <span className="flex size-6 items-center justify-center rounded-md text-violet-600 bg-violet-500/10">?</span>
         <span className="text-xs font-semibold flex-1 truncate">{data.title || "שאלה חדשה"}</span>
         {!data._connected && <span className="size-1.5 rounded-full bg-amber-500 shrink-0" />}
+        {combined && (
+          <Handle
+            type="source"
+            position={Position.Right}
+            style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", right: -8 }}
+            className="!size-2.5 !bg-primary !border-2 !border-card"
+          />
+        )}
       </div>
       <div className="py-1.5">
         {isChoice ? (
           data.options.map((opt) => (
             <div key={opt.id} className="relative flex items-center justify-between px-3 py-1.5 text-xs hover:bg-accent/50">
               <span className="truncate">{opt.label || "אפשרות"}</span>
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={opt.id}
-                style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", right: -8 }}
-                className="!size-2.5 !bg-primary !border-2 !border-card"
-              />
+              {!combined && (
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={opt.id}
+                  style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", right: -8 }}
+                  className="!size-2.5 !bg-primary !border-2 !border-card"
+                />
+              )}
             </div>
           ))
         ) : (
