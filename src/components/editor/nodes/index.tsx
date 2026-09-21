@@ -36,15 +36,15 @@ export function QuestionNodeRenderer({ selected, data }: NodeProps<WithConnected
   const combined = isChoice && data.combineAnswers;
   return (
     <div
-      className={`relative w-72 rounded-xl border bg-card shadow-sm ${
+      className={`relative w-80 rounded-xl border bg-card shadow-sm ${
         selected ? "border-primary ring-2 ring-primary/30" : "border-border"
       }`}
     >
       <Handle type="target" position={Position.Left} className="!inset-0 !size-full !translate-none !rounded-xl !border-0 !bg-transparent" />
       <span className="pointer-events-none absolute top-1/2 left-0 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card bg-muted-foreground/50" />
       <div className="relative flex items-center gap-2 border-b px-3 py-2">
-        <span className="flex size-6 items-center justify-center rounded-md text-violet-600 bg-violet-500/10">?</span>
-        <span className="text-xs font-semibold flex-1 truncate">{data.title || "שאלה חדשה"}</span>
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-md text-violet-600 bg-violet-500/10">?</span>
+        <span className="text-xs font-semibold text-muted-foreground flex-1">שאלה</span>
         {!data._connected && <span className="size-1.5 rounded-full bg-amber-500 shrink-0" />}
         {combined && (
           <Handle
@@ -55,24 +55,32 @@ export function QuestionNodeRenderer({ selected, data }: NodeProps<WithConnected
           />
         )}
       </div>
-      <div className="py-1.5">
+      <div className="p-3 space-y-2">
+        <p className="whitespace-pre-wrap break-words rounded-lg bg-muted/40 p-2.5 text-sm font-semibold leading-snug">
+          {data.title || "שאלה חדשה"}
+        </p>
         {isChoice ? (
-          data.options.map((opt) => (
-            <div key={opt.id} className="relative flex items-center justify-between px-3 py-1.5 text-xs hover:bg-accent/50">
-              <span className="truncate">{opt.label || "אפשרות"}</span>
-              {!combined && (
-                <Handle
-                  type="source"
-                  position={Position.Right}
-                  id={opt.id}
-                  style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", right: -8 }}
-                  className="!size-2.5 !bg-primary !border-2 !border-card"
-                />
-              )}
-            </div>
-          ))
+          <div className="space-y-1.5">
+            {data.options.map((opt) => (
+              <div
+                key={opt.id}
+                className="relative rounded-lg border bg-accent/30 px-3 py-2 text-xs font-medium leading-snug whitespace-pre-wrap break-words hover:bg-accent/50"
+              >
+                {opt.label || "אפשרות"}
+                {!combined && (
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id={opt.id}
+                    style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", right: -8 }}
+                    className="!size-2.5 !bg-primary !border-2 !border-card"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
         ) : (
-          <div className="px-3 py-2 text-xs text-muted-foreground">
+          <div className="relative rounded-lg bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
             תשובה חופשית ({ANSWER_TYPE_LABEL[data.answerType]})
             <Handle type="source" position={Position.Right} className="!size-2.5 !bg-primary !border-2 !border-card" />
           </div>
