@@ -294,6 +294,11 @@ export async function addLeadNote(supabase: SupabaseClient, leadId: string, text
   if (error) throw error;
 }
 
+export async function deleteLead(supabase: SupabaseClient, leadId: string) {
+  const { error } = await supabase.from("leads").delete().eq("id", leadId);
+  if (error) throw error;
+}
+
 // Public (anonymous-safe) submission path: ids are generated client-side so we
 // never need a SELECT back on rows that anon isn't allowed to read.
 export async function submitPublicQuizResponse(
