@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { WebhookDialog } from "@/components/integrations/webhook-dialog";
 import { createClient } from "@/lib/supabase/client";
+import { useWorkspaceId } from "@/components/layout/workspace-provider";
 import {
   addIntegration,
   deleteIntegration,
-  getWorkspaceId,
   listIntegrations,
   updateIntegration,
 } from "@/lib/supabase/queries";
@@ -159,18 +159,17 @@ function PixelCard({
 
 export default function IntegrationsPage() {
   const supabase = useMemo(() => createClient(), []);
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const workspaceId = useWorkspaceId();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const wsId = await getWorkspaceId(supabase);
-    setWorkspaceId(wsId);
-    const data = await listIntegrations(supabase, wsId);
+    if (!workspaceId) return;
+    const data = await listIntegrations(supabase, workspaceId);
     setIntegrations(data);
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, workspaceId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial client-side data fetch on mount

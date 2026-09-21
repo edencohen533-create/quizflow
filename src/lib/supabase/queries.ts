@@ -85,11 +85,16 @@ async function fetchQuizFlow(supabase: SupabaseClient, quizId: string) {
 }
 
 export async function fetchQuizFull(supabase: SupabaseClient, quizId: string): Promise<Quiz | null> {
-  const { data: quizRow, error } = await supabase.from("quizzes").select("*").eq("id", quizId).maybeSingle();
+  // The quiz row and its flow (nodes/edges/theme) don't depend on each
+  // other — both only need quizId, which is already known — so fetch them
+  // concurrently instead of waiting on the quiz row first.
+  const [{ data: quizRow, error }, flow] = await Promise.all([
+    supabase.from("quizzes").select("*").eq("id", quizId).maybeSingle(),
+    fetchQuizFlow(supabase, quizId),
+  ]);
   if (error) throw error;
   if (!quizRow) return null;
-  const { nodeRows, edgeRows, themeRow } = await fetchQuizFlow(supabase, quizId);
-  return quizRowToQuiz(quizRow, nodeRows, edgeRows, themeRow);
+  return quizRowToQuiz(quizRow, flow.nodeRows, flow.edgeRows, flow.themeRow);
 }
 
 export async function fetchQuizFullBySlug(supabase: SupabaseClient, slug: string): Promise<Quiz | null> {

@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { ChevronLeft, Eye, Save, Rocket, Loader2, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -10,13 +11,37 @@ import { QuizStatusBadge } from "@/components/shared/status-badges";
 import { createClient } from "@/lib/supabase/client";
 import { fetchQuizFull, updateQuizMeta } from "@/lib/supabase/queries";
 import { FlowEditor } from "@/components/editor/flow-editor";
-import { DesignTab } from "@/components/editor/design-tab";
-import { AnalyticsTab } from "@/components/editor/analytics-tab";
-import { ShareTab } from "@/components/editor/share-tab";
 import { ComingSoonTab } from "@/components/editor/coming-soon-tab";
-import { TrackingTab } from "@/components/editor/tracking-tab";
 import { Quiz } from "@/lib/types";
 import { toast } from "sonner";
+
+// Each of these tab bodies (and their heavy deps, e.g. recharts for
+// AnalyticsTab) is only needed once its tab is actually opened — base-ui's
+// Tabs already don't mount inactive panels, so lazy-loading the component
+// itself keeps its code out of this route's initial JS entirely.
+function TabLoading() {
+  return (
+    <div className="flex h-full items-center justify-center p-10 text-muted-foreground">
+      <Loader2 className="size-5 animate-spin" />
+    </div>
+  );
+}
+const DesignTab = dynamic(() => import("@/components/editor/design-tab").then((m) => m.DesignTab), {
+  ssr: false,
+  loading: TabLoading,
+});
+const AnalyticsTab = dynamic(() => import("@/components/editor/analytics-tab").then((m) => m.AnalyticsTab), {
+  ssr: false,
+  loading: TabLoading,
+});
+const ShareTab = dynamic(() => import("@/components/editor/share-tab").then((m) => m.ShareTab), {
+  ssr: false,
+  loading: TabLoading,
+});
+const TrackingTab = dynamic(() => import("@/components/editor/tracking-tab").then((m) => m.TrackingTab), {
+  ssr: false,
+  loading: TabLoading,
+});
 
 export default function QuizEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);

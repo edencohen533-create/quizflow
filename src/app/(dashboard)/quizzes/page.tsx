@@ -34,14 +34,15 @@ import {
 import { QuizStatusBadge } from "@/components/shared/status-badges";
 import { CreateQuizDialog } from "@/components/quizzes/create-quiz-dialog";
 import { createClient } from "@/lib/supabase/client";
-import { deleteQuiz, duplicateQuiz, getWorkspaceId, listLeads, listQuizzes, updateQuizMeta } from "@/lib/supabase/queries";
+import { deleteQuiz, duplicateQuiz, listLeads, listQuizzes, updateQuizMeta } from "@/lib/supabase/queries";
+import { useWorkspaceId } from "@/components/layout/workspace-provider";
 import { seedDemoQuiz } from "@/lib/demo-seed";
 import { Lead, Quiz, QuizStatus } from "@/lib/types";
 
 function QuizzesPageInner() {
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const workspaceId = useWorkspaceId();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,13 +53,12 @@ function QuizzesPageInner() {
   const [seeding, setSeeding] = useState(false);
 
   const load = useCallback(async () => {
-    const wsId = await getWorkspaceId(supabase);
-    setWorkspaceId(wsId);
-    const [q, l] = await Promise.all([listQuizzes(supabase, wsId), listLeads(supabase, wsId)]);
+    if (!workspaceId) return;
+    const [q, l] = await Promise.all([listQuizzes(supabase, workspaceId), listLeads(supabase, workspaceId)]);
     setQuizzes(q);
     setLeads(l);
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, workspaceId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial client-side data fetch on mount
