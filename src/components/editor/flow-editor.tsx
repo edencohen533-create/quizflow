@@ -45,7 +45,7 @@ function defaultDataFor(type: NodeType): QuizNodeData {
         answerType: "single_choice",
         required: true,
         allowOther: false,
-        combineAnswers: false,
+        combineAnswers: true,
         options: [
           { id: uid("opt"), label: "אפשרות 1", value: "opt_1", score: 0, nextNodeId: null },
           { id: uid("opt"), label: "אפשרות 2", value: "opt_2", score: 0, nextNodeId: null },
