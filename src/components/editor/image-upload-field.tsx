@@ -41,7 +41,7 @@ export function ImageUploadField({
       {value && (
         <div className="relative overflow-hidden rounded-lg border">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt="" className={previewClassName} />
+          <img src={value} alt="" className={previewClassName} draggable={false} />
           <Button
             type="button"
             variant="secondary"
