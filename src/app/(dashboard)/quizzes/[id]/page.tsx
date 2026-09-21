@@ -130,7 +130,6 @@ export default function QuizEditorPage({ params }: { params: Promise<{ id: strin
           <TabsList className="bg-transparent h-11 p-0 gap-1">
             <TabsTrigger value="flow" className="data-[state=active]:bg-accent">זרימה</TabsTrigger>
             <TabsTrigger value="design" className="data-[state=active]:bg-accent">עיצוב</TabsTrigger>
-            <TabsTrigger value="ai" className="data-[state=active]:bg-accent">AI</TabsTrigger>
             <TabsTrigger
               value="tracking"
               className="flex items-center gap-1.5 data-[state=active]:bg-emerald-500/15 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400"
@@ -152,9 +151,6 @@ export default function QuizEditorPage({ params }: { params: Promise<{ id: strin
         </TabsContent>
         <TabsContent value="design" className="flex-1 min-h-0 m-0 overflow-auto">
           <DesignTab quiz={quiz} onThemeChange={(theme) => setQuiz({ ...quiz, theme })} />
-        </TabsContent>
-        <TabsContent value="ai" className="flex-1 min-h-0 m-0 overflow-auto">
-          <ComingSoonTab title="AI" description="יצירת שאלון אוטומטית וניסוח שאלות בעזרת AI תגיע בשלב הבא." />
         </TabsContent>
         <TabsContent value="tracking" className="flex-1 min-h-0 m-0 overflow-auto">
           <TrackingTab quiz={quiz} />
