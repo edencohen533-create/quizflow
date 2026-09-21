@@ -2,6 +2,7 @@ export type NodeType =
   | "start"
   | "message"
   | "question"
+  | "open_question"
   | "name"
   | "lead_details"
   | "condition"
@@ -52,6 +53,17 @@ export interface QuestionNodeData {
   // used for non-choice answer types (text/number/rating/date) — single continuation
   nextNodeId: string | null;
   // JSON key this answer is sent under to webhooks (e.g. "age"); falls back to the node id when unset
+  paramKey?: string;
+}
+
+export interface OpenQuestionNodeData {
+  kind: "open_question";
+  title: string;
+  description?: string;
+  required: boolean;
+  longAnswer: boolean;
+  nextNodeId: string | null;
+  // JSON key this answer is sent under to webhooks (e.g. "feedback"); falls back to the node id when unset
   paramKey?: string;
 }
 
@@ -133,6 +145,7 @@ export type QuizNodeData =
   | StartNodeData
   | MessageNodeData
   | QuestionNodeData
+  | OpenQuestionNodeData
   | NameNodeData
   | LeadDetailsNodeData
   | ConditionNodeData

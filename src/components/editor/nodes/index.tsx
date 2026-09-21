@@ -8,6 +8,7 @@ import {
   LeadDetailsNodeData,
   MessageNodeData,
   NameNodeData,
+  OpenQuestionNodeData,
   QuestionNodeData,
   ScoreNodeData,
 } from "@/lib/types";
@@ -26,6 +27,14 @@ export function MessageNodeRenderer({ selected, data }: NodeProps<WithConnected<
   return (
     <BaseNode type="message" title={data.title || "הודעה"} selected={selected} connected={data._connected}>
       <p className="line-clamp-2">{data.text || "ללא טקסט"}</p>
+    </BaseNode>
+  );
+}
+
+export function OpenQuestionNodeRenderer({ selected, data }: NodeProps<WithConnected<OpenQuestionNodeData>>) {
+  return (
+    <BaseNode type="open_question" title={data.title || "שאלה פתוחה"} selected={selected} connected={data._connected}>
+      {data.longAnswer ? "תשובה ארוכה" : "תשובה קצרה"}
     </BaseNode>
   );
 }
@@ -184,6 +193,7 @@ export const nodeTypes = {
   start: StartNodeRenderer,
   message: MessageNodeRenderer,
   question: QuestionNodeRenderer,
+  open_question: OpenQuestionNodeRenderer,
   name: NameNodeRenderer,
   lead_details: LeadDetailsNodeRenderer,
   condition: ConditionNodeRenderer,

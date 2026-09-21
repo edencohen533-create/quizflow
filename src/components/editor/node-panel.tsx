@@ -19,6 +19,7 @@ import {
   LeadDetailsNodeData,
   MessageNodeData,
   NameNodeData,
+  OpenQuestionNodeData,
   QuestionAnswerType,
   QuestionNodeData,
   QuizNode,
@@ -88,6 +89,9 @@ export function NodePanel({
         )}
         {node.data.kind === "question" && (
           <QuestionForm data={node.data} onChange={onChange} />
+        )}
+        {node.data.kind === "open_question" && (
+          <OpenQuestionForm data={node.data} onChange={onChange} />
         )}
         {node.data.kind === "name" && (
           <NameForm data={node.data} onChange={onChange} />
@@ -248,6 +252,38 @@ function QuestionForm({ data, onChange }: { data: QuestionNodeData; onChange: (d
           </Button>
         </div>
       )}
+    </>
+  );
+}
+
+function OpenQuestionForm({ data, onChange }: { data: OpenQuestionNodeData; onChange: (d: QuizNodeData) => void }) {
+  return (
+    <>
+      <Field label="כותרת השאלה">
+        <Input value={data.title} onChange={(e) => onChange({ ...data, title: e.target.value })} />
+      </Field>
+      <Field label="תיאור (אופציונלי)">
+        <Textarea rows={2} value={data.description ?? ""} onChange={(e) => onChange({ ...data, description: e.target.value })} />
+      </Field>
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-muted-foreground">שדה חובה</Label>
+        <Switch checked={data.required} onCheckedChange={(v) => onChange({ ...data, required: v })} />
+      </div>
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-muted-foreground">תשובה ארוכה (טקסט חופשי)</Label>
+        <Switch checked={data.longAnswer} onCheckedChange={(v) => onChange({ ...data, longAnswer: v })} />
+      </div>
+      <Field label="מפתח לשליחה ב-Webhook (אופציונלי)">
+        <Input
+          dir="ltr"
+          value={data.paramKey ?? ""}
+          onChange={(e) => onChange({ ...data, paramKey: sanitizeParamKey(e.target.value) })}
+          placeholder="feedback"
+        />
+        <p className="text-xs text-muted-foreground">
+          המפתח (key) שתחתיו התשובה הזו תישלח ב-webhook. ריק = לפי מזהה הצומת.
+        </p>
+      </Field>
     </>
   );
 }
