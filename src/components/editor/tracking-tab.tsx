@@ -56,7 +56,7 @@ function timeAgo(iso?: string) {
   return new Date(iso).toLocaleDateString("he-IL");
 }
 
-function WebhookRow({ integration, onChanged }: { integration: Integration; onChanged: () => void }) {
+function WebhookRow({ integration, onChanged, onEdit }: { integration: Integration; onChanged: () => void; onEdit: () => void }) {
   const supabase = useMemo(() => createClient(), []);
   const [testing, setTesting] = useState(false);
 
@@ -103,6 +103,9 @@ function WebhookRow({ integration, onChanged }: { integration: Integration; onCh
       <Button variant="outline" size="sm" onClick={handleTest} disabled={testing}>
         {testing ? <Loader2 className="size-3.5 animate-spin" /> : null}
         שלח בדיקה
+      </Button>
+      <Button variant="ghost" size="icon" className="size-8" onClick={onEdit}>
+        <Pencil className="size-4" />
       </Button>
       <Switch checked={integration.enabled} onCheckedChange={handleToggle} />
       <Button variant="ghost" size="icon" className="size-8 text-destructive" onClick={handleDelete}>
@@ -198,6 +201,7 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
 
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [webhookDialogOpen, setWebhookDialogOpen] = useState(false);
+  const [editingWebhook, setEditingWebhook] = useState<Integration | undefined>(undefined);
 
   const load = useCallback(async () => {
     const [s, e, a, i] = await Promise.all([
@@ -399,7 +403,7 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
             <Zap className="size-4 text-muted-foreground" />
             <CardTitle className="text-base">Webhooks (כולל Zapier, CRM, Make, Slack)</CardTitle>
           </div>
-          <Button size="sm" onClick={() => setWebhookDialogOpen(true)}>
+          <Button size="sm" onClick={() => { setEditingWebhook(undefined); setWebhookDialogOpen(true); }}>
             <Plus className="size-4" /> Webhook חדש
           </Button>
         </CardHeader>
@@ -410,7 +414,12 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
             </p>
           ) : (
             integrations.filter((i) => i.kind === "webhook").map((w) => (
-              <WebhookRow key={w.id} integration={w} onChanged={reloadIntegrations} />
+              <WebhookRow
+                key={w.id}
+                integration={w}
+                onChanged={reloadIntegrations}
+                onEdit={() => { setEditingWebhook(w); setWebhookDialogOpen(true); }}
+              />
             ))
           )}
         </CardContent>
@@ -489,10 +498,12 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
       />
 
       <WebhookDialog
+        key={editingWebhook?.id ?? "new"}
         open={webhookDialogOpen}
         onOpenChange={setWebhookDialogOpen}
         workspaceId={quiz.workspaceId}
         quizId={quiz.id}
+        existing={editingWebhook}
         onCreated={reloadIntegrations}
       />
     </div>
