@@ -1,4 +1,4 @@
-import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
+import type { RealtimeChannel, RealtimePostgresChangesPayload, SupabaseClient } from "@supabase/supabase-js";
 import { QuizSession } from "@/lib/types";
 import { QuizSessionRow, sessionRowToSession } from "./mappers";
 
@@ -38,14 +38,29 @@ export async function setDemoLiveEnabled(supabase: SupabaseClient, workspaceId: 
 export function subscribeToSessions(
   supabase: SupabaseClient,
   workspaceId: string,
-  onChange: () => void
+  onChange: (payload: RealtimePostgresChangesPayload<QuizSessionRow>) => void
 ): RealtimeChannel {
   return supabase
     .channel(`quiz-sessions-${workspaceId}`)
-    .on(
+    .on<QuizSessionRow>(
       "postgres_changes",
       { event: "*", schema: "public", table: "quiz_sessions", filter: `workspace_id=eq.${workspaceId}` },
       onChange
     )
     .subscribe();
+}
+
+// Applies one realtime change to an already-loaded, last_event_at-desc
+// sorted session list, without refetching all 200 rows on every event.
+export function applySessionChange(
+  sessions: QuizSession[],
+  payload: RealtimePostgresChangesPayload<QuizSessionRow>
+): QuizSession[] {
+  if (payload.eventType === "DELETE") {
+    const deletedId = (payload.old as { id?: string }).id;
+    return deletedId ? sessions.filter((s) => s.id !== deletedId) : sessions;
+  }
+  const updated = sessionRowToSession(payload.new);
+  const withoutOld = sessions.filter((s) => s.id !== updated.id);
+  return [updated, ...withoutOld].sort((a, b) => (a.lastEventAt < b.lastEventAt ? 1 : -1));
 }

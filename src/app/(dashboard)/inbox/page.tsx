@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspaceId } from "@/components/layout/workspace-provider";
 import {
+  applySessionChange,
   deleteDemoSessions,
   deleteSession,
   getDemoLiveEnabled,
@@ -37,16 +38,13 @@ export default function InboxPage() {
 
   useEffect(() => {
     if (!workspaceId) return;
-    async function reload() {
-      const list = await listLiveSessions(supabase, workspaceId!);
-      setSessions(list);
-    }
-    const channel = subscribeToSessions(supabase, workspaceId, reload);
+    const channel = subscribeToSessions(supabase, workspaceId, (payload) => {
+      setSessions((prev) => applySessionChange(prev, payload).slice(0, 200));
+    });
     return () => {
       supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId]);
+  }, [supabase, workspaceId]);
 
   useEffect(() => {
     if (!workspaceId) return;

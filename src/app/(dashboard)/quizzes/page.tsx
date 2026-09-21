@@ -34,17 +34,17 @@ import {
 import { QuizStatusBadge } from "@/components/shared/status-badges";
 import { CreateQuizDialog } from "@/components/quizzes/create-quiz-dialog";
 import { createClient } from "@/lib/supabase/client";
-import { deleteQuiz, duplicateQuiz, listLeads, listQuizzes, updateQuizMeta } from "@/lib/supabase/queries";
+import { deleteQuiz, duplicateQuiz, listLeadCounts, listQuizzes, updateQuizMeta } from "@/lib/supabase/queries";
 import { useWorkspaceId } from "@/components/layout/workspace-provider";
 import { seedDemoQuiz } from "@/lib/demo-seed";
-import { Lead, Quiz, QuizStatus } from "@/lib/types";
+import { Quiz, QuizStatus } from "@/lib/types";
 
 function QuizzesPageInner() {
   const searchParams = useSearchParams();
   const supabase = useMemo(() => createClient(), []);
   const workspaceId = useWorkspaceId();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [leads, setLeads] = useState<{ quizId: string; createdAt: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [dialogOpen, setDialogOpen] = useState(searchParams.get("new") === "1");
@@ -54,7 +54,7 @@ function QuizzesPageInner() {
 
   const load = useCallback(async () => {
     if (!workspaceId) return;
-    const [q, l] = await Promise.all([listQuizzes(supabase, workspaceId), listLeads(supabase, workspaceId)]);
+    const [q, l] = await Promise.all([listQuizzes(supabase, workspaceId), listLeadCounts(supabase, workspaceId)]);
     setQuizzes(q);
     setLeads(l);
     setLoading(false);
