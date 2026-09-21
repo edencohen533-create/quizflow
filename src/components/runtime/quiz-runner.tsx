@@ -421,7 +421,11 @@ function BotNodeContent({ node, params }: { node: QuizNode; params: Record<strin
     return <p className="font-bold">{node.data.title}</p>;
   }
   if (node.data.kind === "lead_details") {
-    return <p className="font-bold">השאירו פרטים ונחזור אליכם</p>;
+    return (
+      <p className="whitespace-pre-line">
+        {renderRichText(interpolateParams(node.data.title || "השאירו פרטים ונחזור אליכם", params))}
+      </p>
+    );
   }
   return null;
 }

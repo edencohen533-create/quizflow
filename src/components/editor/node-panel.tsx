@@ -172,7 +172,7 @@ export function NodePanel({
           <NameForm data={node.data} onChange={onChange} />
         )}
         {node.data.kind === "lead_details" && (
-          <LeadDetailsForm data={node.data} onChange={onChange} />
+          <LeadDetailsForm data={node.data} onChange={onChange} availableParams={availableParams} />
         )}
         {node.data.kind === "condition" && (
           <ConditionForm data={node.data} onChange={onChange} />
@@ -446,9 +446,23 @@ function NameForm({ data, onChange }: { data: NameNodeData; onChange: (d: QuizNo
   );
 }
 
-function LeadDetailsForm({ data, onChange }: { data: LeadDetailsNodeData; onChange: (d: QuizNodeData) => void }) {
+function LeadDetailsForm({ data, onChange, availableParams }: { data: LeadDetailsNodeData; onChange: (d: QuizNodeData) => void; availableParams: AvailableParam[] }) {
+  const titleRef = useRef<HTMLTextAreaElement>(null);
   return (
     <>
+      <Field
+        label="טקסט"
+        action={<RichTextToolbar fieldRef={titleRef} value={data.title ?? ""} onChange={(v) => onChange({ ...data, title: v })} />}
+      >
+        <Textarea
+          ref={titleRef}
+          rows={2}
+          value={data.title ?? ""}
+          onChange={(e) => onChange({ ...data, title: e.target.value })}
+          placeholder="השאירו פרטים ונחזור אליכם"
+        />
+        <ParamChips params={availableParams} onInsert={(token) => onChange({ ...data, title: appendToken(data.title ?? "", token) })} />
+      </Field>
       {[
         { key: "showName" as const, label: "הצג שם מלא" },
         { key: "showPhone" as const, label: "הצג טלפון" },
