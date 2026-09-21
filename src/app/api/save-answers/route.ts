@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(req: NextRequest) {
-  let body: { submissionId?: string; answers?: { nodeId: string; questionTitle: string; answerLabel: string; score: number }[] };
+  let body: { submissionId?: string; answers?: { nodeId: string; questionTitle: string; answerLabel: string; score: number; paramKey?: string }[] };
   try {
     body = await req.json();
   } catch {
@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
       question_title: a.questionTitle,
       answer_label: a.answerLabel,
       score: a.score,
+      param_key: a.paramKey || null,
     }))
   );
 

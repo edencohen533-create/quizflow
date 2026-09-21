@@ -35,6 +35,10 @@ function uid() {
   return Math.random().toString(36).slice(2, 9);
 }
 
+function sanitizeParamKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
 export function NodePanel({
   node,
   onChange,
@@ -200,6 +204,17 @@ function QuestionForm({ data, onChange }: { data: QuestionNodeData; onChange: (d
           <Switch checked={data.allowOther} onCheckedChange={(v) => onChange({ ...data, allowOther: v })} />
         </div>
       )}
+      <Field label="מפתח לשליחה ב-Webhook (אופציונלי)">
+        <Input
+          dir="ltr"
+          value={data.paramKey ?? ""}
+          onChange={(e) => onChange({ ...data, paramKey: sanitizeParamKey(e.target.value) })}
+          placeholder="age"
+        />
+        <p className="text-xs text-muted-foreground">
+          המפתח (key) שתחתיו התשובה לשאלה הזו תישלח ב-webhook. ריק = לפי מזהה הצומת.
+        </p>
+      </Field>
       {isChoice && (
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground">אפשרויות תשובה</Label>
@@ -250,6 +265,17 @@ function NameForm({ data, onChange }: { data: NameNodeData; onChange: (d: QuizNo
         <Label className="text-xs text-muted-foreground">שדה חובה</Label>
         <Switch checked={data.required} onCheckedChange={(v) => onChange({ ...data, required: v })} />
       </div>
+      <Field label="מפתח לשליחה ב-Webhook (אופציונלי)">
+        <Input
+          dir="ltr"
+          value={data.paramKey ?? ""}
+          onChange={(e) => onChange({ ...data, paramKey: sanitizeParamKey(e.target.value) })}
+          placeholder="full_name"
+        />
+        <p className="text-xs text-muted-foreground">
+          המפתח (key) שתחתיו התשובה הזו תישלח ב-webhook. ריק = לפי מזהה הצומת.
+        </p>
+      </Field>
     </>
   );
 }

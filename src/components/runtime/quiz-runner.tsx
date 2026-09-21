@@ -415,7 +415,7 @@ function NodeControls({
           disabled={data.required && !text.trim()}
           onClick={() => {
             onLeadInfoChange({ name: text });
-            onComplete(text || "—", null, { nodeId: node.id, questionTitle: data.title, answerLabel: text || "—", score: 0 });
+            onComplete(text || "—", null, { nodeId: node.id, questionTitle: data.title, answerLabel: text || "—", score: 0, paramKey: data.paramKey });
           }}
         >
           המשך
@@ -436,7 +436,7 @@ function NodeControls({
               <button
                 key={opt.id}
                 onClick={() =>
-                  onComplete(opt.label, opt.id, { nodeId: node.id, questionTitle: data.title, answerLabel: opt.label, score: opt.score })
+                  onComplete(opt.label, opt.id, { nodeId: node.id, questionTitle: data.title, answerLabel: opt.label, score: opt.score, paramKey: data.paramKey })
                 }
                 className="rounded-lg border-2 bg-white px-4 py-3 text-sm font-semibold transition-transform active:scale-[0.97] sm:min-w-[140px] sm:basis-[31%] sm:grow-0"
                 style={{ borderColor: PALETTE.buttonBorder, color: PALETTE.buttonText }}
@@ -477,7 +477,7 @@ function NodeControls({
             onClick={() => {
               const labels = data.options.filter((o) => multi.includes(o.id)).map((o) => o.label).join(", ");
               const totalScore = data.options.filter((o) => multi.includes(o.id)).reduce((s, o) => s + o.score, 0);
-              onComplete(labels || "—", multi[0] ?? null, { nodeId: node.id, questionTitle: data.title, answerLabel: labels || "—", score: totalScore });
+              onComplete(labels || "—", multi[0] ?? null, { nodeId: node.id, questionTitle: data.title, answerLabel: labels || "—", score: totalScore, paramKey: data.paramKey });
             }}
           >
             המשך
@@ -493,6 +493,7 @@ function NodeControls({
         questionTitle: data.title,
         answerLabel: text || "—",
         score: data.answerType === "rating" ? Number(text) || 0 : 0,
+        paramKey: data.paramKey,
       });
       setText("");
     };
