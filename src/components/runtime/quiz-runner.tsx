@@ -123,6 +123,12 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   const [activeNodeId, setActiveNodeId] = useState<string | null>(() =>
     firstNode && firstNode.type !== "end" ? firstNode.id : null
   );
+  // The path of active nodes visited so far, in order — lets the "back"
+  // button return to the previous question without having to re-walk the
+  // (possibly branching) flow graph.
+  const [history, setHistory] = useState<string[]>(() =>
+    firstNode && firstNode.type !== "end" ? [firstNode.id] : []
+  );
   const [answers, setAnswers] = useState<Record<string, LeadAnswer>>({});
   const [leadInfo, setLeadInfo] = useState<LeadInfoState>({ name: "", phone: "", email: "", consent: false });
   const paramValues = useMemo(() => {
@@ -279,6 +285,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
         if (leadInfo.phone || leadInfo.email || leadInfo.name) submitLead(mergedAnswers, mergedScore);
       } else {
         setActiveNodeId(next.id);
+        setHistory((h) => [...h, next.id]);
       }
       pushSessionUpdate(next, Object.keys(mergedAnswers).length, next.type === "end" ? "completed" : "active", mergedAnswers, mergedScore);
       fireEventsForTrigger(next.id, answerForScore);
@@ -291,6 +298,21 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
     setEntries((es) => [...es, { id: uid(), kind: "user", text: userText, ts: Date.now() }]);
     if (node.data.kind === "lead_details") fireEventsForTrigger("__lead_details__");
     advanceTo(node.id, handle, answer);
+  }
+
+  // Undoes the last step: drops the answer bubble and the current
+  // question, and re-activates whichever question came before it.
+  function goBack() {
+    if (history.length < 2) return;
+    const prevId = history[history.length - 2];
+    setHistory((h) => h.slice(0, -1));
+    setAnswers((a) => {
+      const rest = { ...a };
+      delete rest[prevId];
+      return rest;
+    });
+    setEntries((es) => es.slice(0, -2));
+    setActiveNodeId(prevId);
   }
 
   const PALETTE = buildPalette(quiz.theme);
@@ -378,6 +400,15 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
                   </div>
                 </div>
                 <span className="px-1 text-xs" style={{ color: PALETTE.muted }}>{timeLabel(entry.ts)}</span>
+                {isActive && history.length > 1 && (
+                  <button
+                    onClick={goBack}
+                    className="px-1 text-xs underline underline-offset-2"
+                    style={{ color: PALETTE.muted }}
+                  >
+                    ‹ חזרה לשאלה הקודמת
+                  </button>
+                )}
               </div>
             );
           })}
