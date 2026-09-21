@@ -173,6 +173,9 @@ export interface QuizTheme {
   backgroundColor: string;
   textColor: string;
   mutedTextColor?: string;
+  // fall back to primaryColor when unset
+  buttonBorderColor?: string;
+  buttonTextColor?: string;
   backgroundImageUrl?: string;
   backgroundImageUrlMobile?: string;
   overlay: "none" | "light" | "dark";

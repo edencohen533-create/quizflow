@@ -49,6 +49,8 @@ export interface QuizThemeRow {
   background_color: string;
   text_color: string;
   muted_text_color: string | null;
+  button_border_color: string | null;
+  button_text_color: string | null;
   background_image_url: string | null;
   background_image_url_mobile: string | null;
   overlay: "none" | "light" | "dark";
@@ -87,6 +89,8 @@ export function themeRowToTheme(row: QuizThemeRow): QuizTheme {
     backgroundColor: row.background_color,
     textColor: row.text_color,
     mutedTextColor: row.muted_text_color ?? undefined,
+    buttonBorderColor: row.button_border_color ?? undefined,
+    buttonTextColor: row.button_text_color ?? undefined,
     backgroundImageUrl: row.background_image_url ?? undefined,
     backgroundImageUrlMobile: row.background_image_url_mobile ?? undefined,
     overlay: row.overlay,
@@ -108,6 +112,8 @@ export function themeToRow(quizId: string, theme: QuizTheme): QuizThemeRow {
     background_color: theme.backgroundColor,
     text_color: theme.textColor,
     muted_text_color: theme.mutedTextColor ?? null,
+    button_border_color: theme.buttonBorderColor ?? null,
+    button_text_color: theme.buttonTextColor ?? null,
     background_image_url: theme.backgroundImageUrl ?? null,
     background_image_url_mobile: theme.backgroundImageUrlMobile ?? null,
     overlay: theme.overlay,

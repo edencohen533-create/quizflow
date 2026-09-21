@@ -69,6 +69,8 @@ create table if not exists public.quiz_themes (
   background_color text not null default '#f8fafc',
   text_color text not null default '#0f172a',
   muted_text_color text,
+  button_border_color text,
+  button_text_color text,
   background_image_url text,
   background_image_url_mobile text,
   overlay text not null default 'none' check (overlay in ('none', 'light', 'dark')),
@@ -914,3 +916,12 @@ create index if not exists integrations_quiz_id_idx on public.integrations(quiz_
 -- ============================================================
 
 alter table public.integrations add column if not exists extra_params jsonb not null default '[]'::jsonb;
+
+-- ============================================================
+-- 18. Separate button border/text colors from the general primary color,
+--     added to an already-deployed quiz_themes table. Both fall back to
+--     primary_color when unset (see buildPalette()).
+-- ============================================================
+
+alter table public.quiz_themes add column if not exists button_border_color text;
+alter table public.quiz_themes add column if not exists button_text_color text;

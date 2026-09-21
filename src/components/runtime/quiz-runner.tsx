@@ -23,8 +23,8 @@ function buildPalette(theme: QuizTheme) {
     page: theme.backgroundColor || "#F7F6EC",
     bubbleBot: "#FFFFFF",
     bubbleUser: "#F1EFF2",
-    buttonBorder: accent,
-    buttonText: accent,
+    buttonBorder: theme.buttonBorderColor || accent,
+    buttonText: theme.buttonTextColor || accent,
     text: theme.textColor || "#535C82",
     muted: theme.mutedTextColor || "#9AA0BE",
   };
