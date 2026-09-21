@@ -8,14 +8,14 @@ function n(id: string, type: QuizNode["type"], x: number, y: number, data: QuizN
 
 const nodes: QuizNode[] = [
   n("start-1", "start", 0, 0, { kind: "start" }),
-  n("msg-1", "message", 0, 160, {
+  n("msg-1", "message", 320, 0, {
     kind: "message",
     title: "בואו נבדוק את ההתאמה שלך",
     text: "כמה שאלות קצרות שייקחו לך פחות מדקה, ויעזרו לנו להבין את הצרכים הפיננסיים שלך.",
     buttonLabel: "בואו נתחיל",
     nextNodeId: "q-age",
   }),
-  n("q-age", "question", 0, 340, {
+  n("q-age", "question", 640, 0, {
     kind: "question",
     title: "מהו גילך?",
     answerType: "single_choice",
@@ -29,7 +29,7 @@ const nodes: QuizNode[] = [
     ],
     nextNodeId: null,
   }),
-  n("q-field", "question", 0, 520, {
+  n("q-field", "question", 960, 0, {
     kind: "question",
     title: "באיזה תחום עיסוק?",
     answerType: "single_choice",
@@ -43,7 +43,7 @@ const nodes: QuizNode[] = [
     ],
     nextNodeId: null,
   }),
-  n("q-income", "question", 0, 700, {
+  n("q-income", "question", 1280, 0, {
     kind: "question",
     title: "מהו סדר הגודל של ההכנסה החודשית?",
     answerType: "single_choice",
@@ -57,7 +57,7 @@ const nodes: QuizNode[] = [
     ],
     nextNodeId: null,
   }),
-  n("q-priority", "question", 0, 880, {
+  n("q-priority", "question", 1600, 0, {
     kind: "question",
     title: "מה הכי חשוב לך כרגע?",
     answerType: "single_choice",
@@ -71,7 +71,7 @@ const nodes: QuizNode[] = [
     ],
     nextNodeId: null,
   }),
-  n("lead-1", "lead_details", 0, 1060, {
+  n("lead-1", "lead_details", 1920, 0, {
     kind: "lead_details",
     showName: true,
     showPhone: true,
@@ -81,7 +81,7 @@ const nodes: QuizNode[] = [
     consentText: "אני מאשר/ת קבלת מידע ופנייה טלפונית בנוגע לתוצאות הבדיקה.",
     nextNodeId: "end-1",
   }),
-  n("end-1", "end", 0, 1240, {
+  n("end-1", "end", 2240, 0, {
     kind: "end",
     title: "תודה רבה!",
     text: "קיבלנו את הפרטים שלך, ניצור איתך קשר בהקדם עם תוצאות ההתאמה האישית שלך.",

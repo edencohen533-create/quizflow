@@ -126,7 +126,7 @@ export async function createQuiz(
   const endNode: QuizNode = {
     id: `end-${Date.now()}`,
     type: "end",
-    position: { x: 0, y: 250 },
+    position: { x: 350, y: 0 },
     data: { kind: "end", title: "תודה רבה!", text: "קיבלנו את הפרטים שלך.", ctaLabel: "", ctaUrl: "" },
   };
   const startToEndEdge: QuizEdge = { id: `edge-${Date.now()}`, source: startNode.id, sourceHandle: null, target: endNode.id };
