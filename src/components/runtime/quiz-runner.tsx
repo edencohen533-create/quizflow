@@ -328,12 +328,12 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
             if (entry.kind === "typing") {
               return (
                 <div key={entry.id} className="flex items-end justify-start gap-2">
+                  <Avatar url={quiz.theme.avatarUrl} />
                   <div className="flex items-center gap-1.5 rounded-[22px] bg-white px-5 py-4" style={{ background: PALETTE.bubbleBot }}>
                     <span className="size-2 animate-bounce rounded-full bg-current" style={{ color: PALETTE.muted }} />
                     <span className="size-2 animate-bounce rounded-full bg-current [animation-delay:0.15s]" style={{ color: PALETTE.muted }} />
                     <span className="size-2 animate-bounce rounded-full bg-current [animation-delay:0.3s]" style={{ color: PALETTE.muted }} />
                   </div>
-                  <Avatar url={quiz.theme.avatarUrl} />
                 </div>
               );
             }
@@ -351,6 +351,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
             return (
               <div key={entry.id} className="flex flex-col items-end gap-1">
                 <div className="flex items-end gap-2">
+                  <Avatar url={quiz.theme.avatarUrl} />
                   <div
                     className="max-w-[85%] rounded-[22px] px-5 py-4 leading-relaxed"
                     style={{ background: PALETTE.bubbleBot, color: PALETTE.text }}
@@ -368,7 +369,6 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
                       </div>
                     )}
                   </div>
-                  <Avatar url={quiz.theme.avatarUrl} />
                 </div>
                 <span className="px-1 text-xs" style={{ color: PALETTE.muted }}>{timeLabel(entry.ts)}</span>
               </div>
