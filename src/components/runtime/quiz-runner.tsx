@@ -453,7 +453,7 @@ function BotNodeContent({ node, params }: { node: QuizNode; params: Record<strin
     );
   }
   if (node.data.kind === "name") {
-    return <p className="font-bold">{node.data.title}</p>;
+    return <p>{node.data.title}</p>;
   }
   if (node.data.kind === "lead_details") {
     return (
