@@ -73,6 +73,7 @@ export interface LeadRow {
   utm_source: string | null;
   utm_medium: string | null;
   utm_campaign: string | null;
+  utm_content: string | null;
   assigned_to: string | null;
   created_at: string;
   quizzes?: { name: string } | null;
@@ -183,6 +184,7 @@ export function leadRowToLead(row: LeadRow, answers: LeadAnswer[], notes: LeadNo
     utmSource: row.utm_source ?? undefined,
     utmMedium: row.utm_medium ?? undefined,
     utmCampaign: row.utm_campaign ?? undefined,
+    utmContent: row.utm_content ?? undefined,
     answers,
     notes,
     assignedTo: row.assigned_to ?? undefined,

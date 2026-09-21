@@ -283,6 +283,7 @@ export interface Lead {
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;
+  utmContent?: string;
   answers: LeadAnswer[];
   notes: LeadNote[];
   assignedTo?: string;
