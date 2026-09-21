@@ -26,10 +26,24 @@ function buildPreviewPalette(theme: QuizTheme) {
 }
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const swatchValue = /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#000000";
   return (
     <div className="space-y-1.5">
       <Label className="text-xs text-muted-foreground">{label}</Label>
-      <Input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="h-9 w-24 p-1" />
+      <div className="flex items-center gap-2">
+        <Input type="color" value={swatchValue} onChange={(e) => onChange(e.target.value)} className="h-9 w-12 shrink-0 p-1" />
+        <Input
+          dir="ltr"
+          value={value}
+          onChange={(e) => {
+            const v = e.target.value.trim();
+            onChange(v && !v.startsWith("#") ? `#${v}` : v);
+          }}
+          placeholder="#F3F3E8"
+          maxLength={7}
+          className="h-9 flex-1 font-mono text-xs uppercase"
+        />
+      </div>
     </div>
   );
 }
