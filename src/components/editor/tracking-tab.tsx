@@ -1,13 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, Plus, Pencil, Copy, Trash2, Target } from "lucide-react";
+import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, Plus, Pencil, Copy, Trash2, Target, Webhook as WebhookIcon, Music2, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { WebhookDialog } from "@/components/integrations/webhook-dialog";
 import { createClient } from "@/lib/supabase/client";
+import {
+  addIntegration,
+  deleteIntegration,
+  listIntegrationsForQuiz,
+  updateIntegration,
+} from "@/lib/supabase/queries";
+import { testWebhook } from "@/lib/integrations";
 import {
   createTrackingEvent,
   deleteTrackingEvent,
@@ -21,7 +29,7 @@ import {
   updateTrackingSettings,
   TrackingEventInput,
 } from "@/lib/supabase/tracking-queries";
-import { Quiz, QuizTrackingActivity, QuizTrackingEvent, QuizTrackingSettings, TRACKING_EVENT_LABELS } from "@/lib/types";
+import { Integration, Quiz, QuizTrackingActivity, QuizTrackingEvent, QuizTrackingSettings, TRACKING_EVENT_LABELS } from "@/lib/types";
 import { TrackingEventDialog } from "@/components/editor/tracking-event-dialog";
 import { toast } from "sonner";
 
@@ -35,6 +43,138 @@ function TRIGGER_LABEL(nodeId: string | null, quiz: Quiz) {
   const node = quiz.nodes.find((n) => n.id === nodeId);
   if (node?.data.kind === "question") return node.data.title;
   return nodeId;
+}
+
+function timeAgo(iso?: string) {
+  if (!iso) return null;
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 1) return "לפני רגע";
+  if (mins < 60) return `לפני ${mins} דקות`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `לפני ${hours} שעות`;
+  return new Date(iso).toLocaleDateString("he-IL");
+}
+
+function WebhookRow({ integration, onChanged }: { integration: Integration; onChanged: () => void }) {
+  const supabase = useMemo(() => createClient(), []);
+  const [testing, setTesting] = useState(false);
+
+  async function handleTest() {
+    setTesting(true);
+    const result = await testWebhook(supabase, integration);
+    setTesting(false);
+    if (result.ok) toast.success("הבדיקה הצליחה — ה-webhook קיבל את הבקשה");
+    else toast.error(`הבדיקה נכשלה: ${result.error ?? "שגיאה לא ידועה"}`);
+    onChanged();
+  }
+
+  async function handleToggle(checked: boolean) {
+    await updateIntegration(supabase, integration.id, { enabled: checked });
+    onChanged();
+  }
+
+  async function handleDelete() {
+    await deleteIntegration(supabase, integration.id);
+    onChanged();
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border p-3">
+      <span className="flex size-9 items-center justify-center rounded-lg bg-accent text-accent-foreground shrink-0">
+        <WebhookIcon className="size-4.5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-sm truncate">{integration.name}</p>
+        <p className="text-xs text-muted-foreground truncate" dir="ltr">{integration.url}</p>
+        {integration.lastTriggeredAt && (
+          <p className="text-xs mt-0.5 flex items-center gap-1">
+            {integration.lastStatus === "success" ? (
+              <CheckCircle2 className="size-3 text-primary" />
+            ) : (
+              <XCircle className="size-3 text-destructive" />
+            )}
+            <span className="text-muted-foreground">
+              {integration.lastStatus === "success" ? "נשלח בהצלחה" : `שגיאה: ${integration.lastError}`} · {timeAgo(integration.lastTriggeredAt)}
+            </span>
+          </p>
+        )}
+      </div>
+      <Button variant="outline" size="sm" onClick={handleTest} disabled={testing}>
+        {testing ? <Loader2 className="size-3.5 animate-spin" /> : null}
+        שלח בדיקה
+      </Button>
+      <Switch checked={integration.enabled} onCheckedChange={handleToggle} />
+      <Button variant="ghost" size="icon" className="size-8 text-destructive" onClick={handleDelete}>
+        <Trash2 className="size-4" />
+      </Button>
+    </div>
+  );
+}
+
+function TikTokPixelCard({
+  existing,
+  workspaceId,
+  quizId,
+  onChanged,
+}: {
+  existing?: Integration;
+  workspaceId: string;
+  quizId: string;
+  onChanged: () => void;
+}) {
+  const supabase = useMemo(() => createClient(), []);
+  const [value, setValue] = useState(existing?.pixelId ?? "");
+
+  async function handleSave() {
+    if (!value.trim()) return;
+    if (existing) await updateIntegration(supabase, existing.id, { pixelId: value.trim(), enabled: true });
+    else await addIntegration(supabase, workspaceId, quizId, { kind: "tiktok_pixel", name: "TikTok Pixel", pixelId: value.trim() });
+    toast.success("TikTok Pixel נשמר ופעיל");
+    onChanged();
+  }
+
+  async function handleToggle(checked: boolean) {
+    if (!existing) return;
+    await updateIntegration(supabase, existing.id, { enabled: checked });
+    onChanged();
+  }
+
+  async function handleDelete() {
+    if (!existing) return;
+    await deleteIntegration(supabase, existing.id);
+    onChanged();
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex items-start gap-3 py-4">
+        <span className="flex size-9 items-center justify-center rounded-lg bg-accent text-accent-foreground shrink-0">
+          <Music2 className="size-4.5" />
+        </span>
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="font-medium text-sm">TikTok Pixel</p>
+            {existing && (
+              <div className="flex items-center gap-2">
+                <Switch checked={existing.enabled} onCheckedChange={handleToggle} />
+                <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={handleDelete}>
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            שולח אירוע &quot;ליד&quot; אוטומטית לפיקסל בכל שליחת השאלון הזה, ישירות מדפדפן המשתמש.
+          </p>
+          <div className="flex gap-2">
+            <Input dir="ltr" value={value} onChange={(e) => setValue(e.target.value)} placeholder="Pixel Code, לדוגמה CXXXXXXXXXXXXXXXXX" className="h-8 text-xs" />
+            <Button size="sm" onClick={handleSave} disabled={!value.trim()}>שמור</Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function TrackingTab({ quiz }: { quiz: Quiz }) {
@@ -56,11 +196,15 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
   const [editingEvent, setEditingEvent] = useState<QuizTrackingEvent | undefined>(undefined);
   const seedingRef = useRef(false);
 
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [webhookDialogOpen, setWebhookDialogOpen] = useState(false);
+
   const load = useCallback(async () => {
-    const [s, e, a] = await Promise.all([
+    const [s, e, a, i] = await Promise.all([
       getTrackingSettings(supabase, quiz.id),
       listTrackingEvents(supabase, quiz.id),
       listTrackingActivity(supabase, quiz.id),
+      listIntegrationsForQuiz(supabase, quiz.id),
     ]);
     setSettings(s);
     setPixelId(s.metaPixelId ?? "");
@@ -73,8 +217,13 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
       setEvents(e);
     }
     setActivity(a);
+    setIntegrations(i);
     setLoading(false);
   }, [supabase, quiz.id]);
+
+  async function reloadIntegrations() {
+    setIntegrations(await listIntegrationsForQuiz(supabase, quiz.id));
+  }
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial client-side data fetch on mount
@@ -246,6 +395,36 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Zap className="size-4 text-muted-foreground" />
+            <CardTitle className="text-base">Webhooks (כולל Zapier, CRM, Make, Slack)</CardTitle>
+          </div>
+          <Button size="sm" onClick={() => setWebhookDialogOpen(true)}>
+            <Plus className="size-4" /> Webhook חדש
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {integrations.filter((i) => i.kind === "webhook").length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">
+              עדיין לא הוגדרו webhooks. לחץ על &quot;Webhook חדש&quot; כדי להתחיל.
+            </p>
+          ) : (
+            integrations.filter((i) => i.kind === "webhook").map((w) => (
+              <WebhookRow key={w.id} integration={w} onChanged={reloadIntegrations} />
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <TikTokPixelCard
+        existing={integrations.find((i) => i.kind === "tiktok_pixel")}
+        workspaceId={quiz.workspaceId}
+        quizId={quiz.id}
+        onChanged={reloadIntegrations}
+      />
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">אירועי המרה לפי צעד</CardTitle>
           <Button size="sm" onClick={() => { setEditingEvent(undefined); setDialogOpen(true); }}>
             <Plus className="size-4" /> הוסף אירוע
@@ -307,6 +486,14 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
         nodes={quiz.nodes}
         initial={editingEvent}
         onSave={handleSaveEvent}
+      />
+
+      <WebhookDialog
+        open={webhookDialogOpen}
+        onOpenChange={setWebhookDialogOpen}
+        workspaceId={quiz.workspaceId}
+        quizId={quiz.id}
+        onCreated={reloadIntegrations}
       />
     </div>
   );

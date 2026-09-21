@@ -41,10 +41,6 @@ const TrackingTab = dynamic(() => import("@/components/editor/tracking-tab").the
   ssr: false,
   loading: TabLoading,
 });
-const IntegrationsTab = dynamic(() => import("@/components/editor/integrations-tab").then((m) => m.IntegrationsTab), {
-  ssr: false,
-  loading: TabLoading,
-});
 
 export default function QuizEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -164,7 +160,6 @@ export default function QuizEditorPage({ params }: { params: Promise<{ id: strin
             >
               <Target className="size-3.5" /> טראקינג
             </TabsTrigger>
-            <TabsTrigger value="integrations" className="data-[state=active]:bg-accent">אינטגרציות</TabsTrigger>
             <TabsTrigger value="analytics" className="data-[state=active]:bg-accent">אנליטיקה</TabsTrigger>
             <TabsTrigger value="share" className="data-[state=active]:bg-accent">שיתוף והטמעה</TabsTrigger>
           </TabsList>
@@ -182,9 +177,6 @@ export default function QuizEditorPage({ params }: { params: Promise<{ id: strin
         </TabsContent>
         <TabsContent value="tracking" className="flex-1 min-h-0 m-0 overflow-auto">
           <TrackingTab quiz={quiz} />
-        </TabsContent>
-        <TabsContent value="integrations" className="flex-1 min-h-0 m-0 overflow-auto">
-          <IntegrationsTab quiz={quiz} />
         </TabsContent>
         <TabsContent value="analytics" className="flex-1 min-h-0 m-0 overflow-auto">
           <AnalyticsTab quiz={quiz} />
