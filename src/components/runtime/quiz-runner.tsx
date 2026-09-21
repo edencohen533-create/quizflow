@@ -393,9 +393,15 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
 function BotNodeContent({ node, params }: { node: QuizNode; params: Record<string, string> }) {
   if (node.data.kind === "message") {
     return (
-      <div className="space-y-2 whitespace-pre-line">
-        {node.data.title && <p>{renderRichText(interpolateParams(node.data.title, params))}</p>}
-        <p>{renderRichText(interpolateParams(node.data.text, params))}</p>
+      <div className="space-y-3">
+        {node.data.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={node.data.imageUrl} alt="" className="w-full rounded-xl object-cover" />
+        )}
+        <div className="space-y-2 whitespace-pre-line">
+          {node.data.title && <p>{renderRichText(interpolateParams(node.data.title, params))}</p>}
+          <p>{renderRichText(interpolateParams(node.data.text, params))}</p>
+        </div>
       </div>
     );
   }
