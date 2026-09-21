@@ -303,7 +303,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
       <style>{`.qf-runner-bg{background:${desktopBg};}@media (max-width:767px){.qf-runner-bg{background:${mobileBg};}}`}</style>
       <div className="mx-auto max-w-2xl px-4 pb-32 pt-6 sm:px-6">
         {quiz.theme.logoUrl && (
-          <div className="mb-6 flex items-center justify-center rounded-[28px] bg-white px-8 py-10 shadow-sm">
+          <div className="mb-8 flex items-center justify-center rounded-[28px] bg-white px-8 py-10 shadow-sm">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={quiz.theme.logoUrl} alt={quiz.name} className="h-24 max-w-full object-contain" />
           </div>
@@ -406,7 +406,7 @@ function BotNodeContent({ node, params }: { node: QuizNode; params: Record<strin
     );
     const title = <p key="title" className="whitespace-pre-line">{renderRichText(interpolateParams(node.data.title, params))}</p>;
     return (
-      <div className="space-y-2">
+      <div className="space-y-3">
         {node.data.imagePosition === "below" ? [title, image] : [image, title]}
       </div>
     );
