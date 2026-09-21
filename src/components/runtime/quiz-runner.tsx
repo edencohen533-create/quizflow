@@ -33,6 +33,15 @@ function backgroundValue(imageUrl: string | undefined, fallbackColor: string) {
   return imageUrl ? `url(${JSON.stringify(imageUrl)}) center/cover no-repeat` : fallbackColor;
 }
 
+// Replaces {{key}} tokens in bot text with a previously captured answer,
+// looked up by the question/name block's own param key (or by "name"/
+// "phone"/"email" for the built-in lead-details fields).
+function interpolateParams(text: string, values: Record<string, string>): string {
+  return text.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key: string) =>
+    key in values ? values[key] : match
+  );
+}
+
 function Avatar({ url, size = 34 }: { url?: string; size?: number }) {
   if (url) {
     return (
@@ -114,6 +123,13 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   );
   const [answers, setAnswers] = useState<Record<string, LeadAnswer>>({});
   const [leadInfo, setLeadInfo] = useState<LeadInfoState>({ name: "", phone: "", email: "", consent: false });
+  const paramValues = useMemo(() => {
+    const values: Record<string, string> = { name: leadInfo.name, phone: leadInfo.phone, email: leadInfo.email };
+    for (const a of Object.values(answers)) {
+      values[a.paramKey || a.nodeId] = a.answerLabel;
+    }
+    return values;
+  }, [answers, leadInfo]);
 
   // Meta Pixel/CAPI + GTM tracking (separate from the quiz's own analytics/
   // integrations calls above — additive, doesn't affect existing behavior).
@@ -324,7 +340,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
             if (entry.kind === "result") {
               const node = quiz.nodes.find((n) => n.id === entry.nodeId);
               if (!node || node.data.kind !== "end") return null;
-              return <ResultCard key={entry.id} data={node.data} palette={PALETTE} avatarUrl={quiz.theme.avatarUrl} />;
+              return <ResultCard key={entry.id} data={node.data} palette={PALETTE} avatarUrl={quiz.theme.avatarUrl} params={paramValues} />;
             }
 
             const node = quiz.nodes.find((n) => n.id === entry.nodeId);
@@ -338,7 +354,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
                     className="max-w-[85%] rounded-[22px] px-5 py-4 leading-relaxed"
                     style={{ background: PALETTE.bubbleBot, color: PALETTE.text }}
                   >
-                    <BotNodeContent node={node} />
+                    <BotNodeContent node={node} params={paramValues} />
                     {isActive && (
                       <div className="mt-4">
                         <NodeControls
@@ -373,12 +389,12 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   );
 }
 
-function BotNodeContent({ node }: { node: QuizNode }) {
+function BotNodeContent({ node, params }: { node: QuizNode; params: Record<string, string> }) {
   if (node.data.kind === "message") {
     return (
       <div className="space-y-2 whitespace-pre-line">
-        {node.data.title && <p className="font-bold">{node.data.title}</p>}
-        <p>{node.data.text}</p>
+        {node.data.title && <p className="font-bold">{interpolateParams(node.data.title, params)}</p>}
+        <p>{interpolateParams(node.data.text, params)}</p>
       </div>
     );
   }
@@ -387,7 +403,7 @@ function BotNodeContent({ node }: { node: QuizNode }) {
       // eslint-disable-next-line @next/next/no-img-element
       <img key="image" src={node.data.imageUrl} alt="" className="w-full rounded-xl object-cover" />
     );
-    const title = <p key="title" className="whitespace-pre-line font-bold">{node.data.title}</p>;
+    const title = <p key="title" className="whitespace-pre-line font-bold">{interpolateParams(node.data.title, params)}</p>;
     return (
       <div className="space-y-2">
         {node.data.imagePosition === "below" ? [title, image] : [image, title]}
@@ -677,10 +693,12 @@ function ResultCard({
   data,
   palette,
   avatarUrl,
+  params,
 }: {
   data: Extract<QuizNode["data"], { kind: "end" }>;
   palette: Palette;
   avatarUrl?: string;
+  params: Record<string, string>;
 }) {
   const PALETTE = palette;
   const shouldRedirect = !!(data.redirectEnabled && data.redirectUrl);
@@ -705,8 +723,8 @@ function ResultCard({
         <div className="mb-3 flex justify-center">
           <Avatar url={avatarUrl} size={48} />
         </div>
-        <h2 className="whitespace-pre-line text-xl font-bold">{data.title}</h2>
-        <p className="mt-2 whitespace-pre-line leading-relaxed">{data.text}</p>
+        <h2 className="whitespace-pre-line text-xl font-bold">{interpolateParams(data.title, params)}</h2>
+        <p className="mt-2 whitespace-pre-line leading-relaxed">{interpolateParams(data.text, params)}</p>
         {shouldRedirect && (
           <p className="mt-3 text-xs" style={{ color: PALETTE.muted }}>מעביר אותך אוטומטית תוך {secondsLeft} שניות...</p>
         )}
