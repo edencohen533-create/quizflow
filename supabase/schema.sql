@@ -97,6 +97,7 @@ create table if not exists public.leads (
   utm_source text,
   utm_medium text,
   utm_campaign text,
+  utm_content text,
   assigned_to text,
   created_at timestamptz not null default now()
 );
@@ -864,3 +865,11 @@ alter table public.submission_answers add column if not exists param_key text;
 alter table public.quiz_themes add column if not exists avatar_url text;
 alter table public.quiz_themes add column if not exists muted_text_color text;
 alter table public.quiz_themes add column if not exists background_image_url_mobile text;
+
+-- ============================================================
+-- 14. Ad name (utm_content) captured per lead, so the leads table can show
+--     which specific ad drove each lead, added to an already-deployed
+--     leads table.
+-- ============================================================
+
+alter table public.leads add column if not exists utm_content text;

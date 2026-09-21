@@ -223,6 +223,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
         utmSource,
         utmMedium: searchParams.get("utm_medium") ?? undefined,
         utmCampaign: searchParams.get("utm_campaign") ?? undefined,
+        utmContent: searchParams.get("utm_content") ?? undefined,
       },
       Object.values(finalAnswers)
     );

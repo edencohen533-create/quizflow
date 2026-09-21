@@ -290,6 +290,7 @@ export async function submitPublicQuizResponse(
     utmSource?: string;
     utmMedium?: string;
     utmCampaign?: string;
+    utmContent?: string;
   },
   answers: LeadAnswer[]
 ) {
@@ -309,6 +310,7 @@ export async function submitPublicQuizResponse(
     utm_source: lead.utmSource ?? null,
     utm_medium: lead.utmMedium ?? null,
     utm_campaign: lead.utmCampaign ?? null,
+    utm_content: lead.utmContent ?? null,
   });
   if (leadError) throw leadError;
 

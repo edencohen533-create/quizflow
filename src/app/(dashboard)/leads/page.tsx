@@ -20,7 +20,7 @@ import { getWorkspaceId, listLeads } from "@/lib/supabase/queries";
 import { LEAD_STATUS_LABELS, Lead, LeadStatus } from "@/lib/types";
 
 function exportCsv(leads: Lead[]) {
-  const header = ["שם", "טלפון", "אימייל", "שאלון", "ציון", "סטטוס", "מקור", "תאריך"];
+  const header = ["שם", "טלפון", "אימייל", "שאלון", "ציון", "סטטוס", "מקור", "שם המודעה", "תאריך"];
   const rows = leads.map((l) => [
     l.name,
     l.phone,
@@ -29,6 +29,7 @@ function exportCsv(leads: Lead[]) {
     String(l.score),
     LEAD_STATUS_LABELS[l.status],
     l.utmSource ?? "",
+    l.utmContent ?? "",
     new Date(l.createdAt).toLocaleDateString("he-IL"),
   ]);
   const csv = [header, ...rows].map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -120,6 +121,7 @@ export default function LeadsPage() {
                 <TableHead>ציון</TableHead>
                 <TableHead>סטטוס</TableHead>
                 <TableHead>מקור UTM</TableHead>
+                <TableHead>שם המודעה</TableHead>
                 <TableHead>תאריך מילוי</TableHead>
                 <TableHead>נציג</TableHead>
               </TableRow>
@@ -137,6 +139,7 @@ export default function LeadsPage() {
                   </TableCell>
                   <TableCell><LeadStatusBadge status={lead.status} /></TableCell>
                   <TableCell className="text-muted-foreground text-sm">{lead.utmSource}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{lead.utmContent ?? "—"}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">{new Date(lead.createdAt).toLocaleDateString("he-IL")}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">{lead.assignedTo ?? "—"}</TableCell>
                 </TableRow>
