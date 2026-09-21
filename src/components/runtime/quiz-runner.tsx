@@ -285,14 +285,12 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
     <div dir="rtl" className="qf-runner-bg min-h-screen">
       <style>{`.qf-runner-bg{background:${desktopBg};}@media (max-width:767px){.qf-runner-bg{background:${mobileBg};}}`}</style>
       <div className="mx-auto max-w-2xl px-4 pb-32 pt-6 sm:px-6">
-        <div className="mb-6 flex items-center justify-center rounded-[28px] bg-white py-8 shadow-sm">
-          {quiz.theme.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
+        {quiz.theme.logoUrl && (
+          <div className="mb-6 flex items-center justify-center rounded-[28px] bg-white py-8 shadow-sm">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={quiz.theme.logoUrl} alt={quiz.name} className="h-14 object-contain" />
-          ) : (
-            <p className="text-2xl font-bold" style={{ color: PALETTE.text }}>{quiz.name}</p>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="space-y-5">
           {entries.map((entry) => {
@@ -389,7 +387,7 @@ function BotNodeContent({ node }: { node: QuizNode }) {
       // eslint-disable-next-line @next/next/no-img-element
       <img key="image" src={node.data.imageUrl} alt="" className="w-full rounded-xl object-cover" />
     );
-    const title = <p key="title" className="font-bold">{node.data.title}</p>;
+    const title = <p key="title" className="whitespace-pre-line font-bold">{node.data.title}</p>;
     return (
       <div className="space-y-2">
         {node.data.imagePosition === "below" ? [title, image] : [image, title]}
@@ -707,8 +705,8 @@ function ResultCard({
         <div className="mb-3 flex justify-center">
           <Avatar url={avatarUrl} size={48} />
         </div>
-        <h2 className="text-xl font-bold">{data.title}</h2>
-        <p className="mt-2 leading-relaxed">{data.text}</p>
+        <h2 className="whitespace-pre-line text-xl font-bold">{data.title}</h2>
+        <p className="mt-2 whitespace-pre-line leading-relaxed">{data.text}</p>
         {shouldRedirect && (
           <p className="mt-3 text-xs" style={{ color: PALETTE.muted }}>מעביר אותך אוטומטית תוך {secondsLeft} שניות...</p>
         )}
