@@ -1,4 +1,4 @@
-import { Handle, NodeProps, Position } from "reactflow";
+import { Handle, NodeProps, Position, useStore } from "reactflow";
 import { BaseNode } from "./base-node";
 import {
   AbTestNodeData,
@@ -13,6 +13,8 @@ import {
 } from "@/lib/types";
 
 type WithConnected<T> = T & { _connected?: boolean };
+
+const connectionInProgressSelector = (s: { connectionNodeId: string | null }) => s.connectionNodeId !== null;
 
 export function StartNodeRenderer({ selected, data }: NodeProps<WithConnected<Record<string, never>>>) {
   return (
@@ -34,13 +36,18 @@ export function MessageNodeRenderer({ selected, data }: NodeProps<WithConnected<
 export function QuestionNodeRenderer({ selected, data }: NodeProps<WithConnected<QuestionNodeData>>) {
   const isChoice = data.answerType === "single_choice" || data.answerType === "multi_choice";
   const combined = isChoice && data.combineAnswers;
+  const connecting = useStore(connectionInProgressSelector);
   return (
     <div
       className={`relative w-80 rounded-xl border bg-card shadow-sm ${
         selected ? "border-primary ring-2 ring-primary/30" : "border-border"
       }`}
     >
-      <Handle type="target" position={Position.Left} className="!inset-0 !size-full !translate-none !rounded-xl !border-0 !bg-transparent" />
+      <Handle
+        type="target"
+        position={Position.Left}
+        className={`!inset-0 !size-full !translate-none !rounded-xl !border-0 !bg-transparent ${connecting ? "" : "!pointer-events-none"}`}
+      />
       <span className="pointer-events-none absolute top-1/2 left-0 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card bg-muted-foreground/50" />
       <div className="relative flex items-center gap-2 border-b px-3 py-2">
         <span className="flex size-6 shrink-0 items-center justify-center rounded-md text-violet-600 bg-violet-500/10">?</span>
@@ -128,13 +135,18 @@ export function AbTestNodeRenderer({ selected, data }: NodeProps<WithConnected<A
     { id: "a", label: "וריאנט A", percent: data.splitPercent },
     { id: "b", label: "וריאנט B", percent: 100 - data.splitPercent },
   ];
+  const connecting = useStore(connectionInProgressSelector);
   return (
     <div
       className={`relative w-72 rounded-xl border bg-card shadow-sm ${
         selected ? "border-primary ring-2 ring-primary/30" : "border-border"
       }`}
     >
-      <Handle type="target" position={Position.Left} className="!inset-0 !size-full !translate-none !rounded-xl !border-0 !bg-transparent" />
+      <Handle
+        type="target"
+        position={Position.Left}
+        className={`!inset-0 !size-full !translate-none !rounded-xl !border-0 !bg-transparent ${connecting ? "" : "!pointer-events-none"}`}
+      />
       <span className="pointer-events-none absolute top-1/2 left-0 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card bg-muted-foreground/50" />
       <div className="flex items-center gap-2 border-b px-3 py-2">
         <span className="flex size-6 items-center justify-center rounded-md text-[10px] font-bold text-cyan-600 bg-cyan-500/10">
