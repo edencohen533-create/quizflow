@@ -24,16 +24,23 @@ export function BaseNode({
   const Icon = meta.icon;
   return (
     <div
-      className={`w-64 rounded-xl border bg-card shadow-sm transition-shadow ${
+      className={`relative w-64 rounded-xl border bg-card shadow-sm transition-shadow ${
         selected ? "border-primary ring-2 ring-primary/30" : "border-border"
       }`}
     >
       {showTarget && (
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="!size-2.5 !bg-muted-foreground/50 !border-2 !border-card"
-        />
+        <>
+          {/* Sized to the whole node instead of a tiny dot, so dropping a
+              connection anywhere on this block — not just one exact point —
+              connects it. The visual anchor stays the same (left-center),
+              since that's still this element's Position.Left reference. */}
+          <Handle
+            type="target"
+            position={Position.Left}
+            className="!inset-0 !size-full !translate-none !rounded-xl !border-0 !bg-transparent"
+          />
+          <span className="pointer-events-none absolute top-1/2 left-0 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card bg-muted-foreground/50" />
+        </>
       )}
       <div className="flex items-center gap-2 border-b px-3 py-2">
         <span className={`flex size-6 items-center justify-center rounded-md ${meta.color}`}>

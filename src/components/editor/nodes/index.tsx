@@ -36,11 +36,12 @@ export function QuestionNodeRenderer({ selected, data }: NodeProps<WithConnected
   const combined = isChoice && data.combineAnswers;
   return (
     <div
-      className={`w-72 rounded-xl border bg-card shadow-sm ${
+      className={`relative w-72 rounded-xl border bg-card shadow-sm ${
         selected ? "border-primary ring-2 ring-primary/30" : "border-border"
       }`}
     >
-      <Handle type="target" position={Position.Left} className="!size-2.5 !bg-muted-foreground/50 !border-2 !border-card" />
+      <Handle type="target" position={Position.Left} className="!inset-0 !size-full !translate-none !rounded-xl !border-0 !bg-transparent" />
+      <span className="pointer-events-none absolute top-1/2 left-0 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card bg-muted-foreground/50" />
       <div className="relative flex items-center gap-2 border-b px-3 py-2">
         <span className="flex size-6 items-center justify-center rounded-md text-violet-600 bg-violet-500/10">?</span>
         <span className="text-xs font-semibold flex-1 truncate">{data.title || "שאלה חדשה"}</span>
@@ -121,11 +122,12 @@ export function AbTestNodeRenderer({ selected, data }: NodeProps<WithConnected<A
   ];
   return (
     <div
-      className={`w-72 rounded-xl border bg-card shadow-sm ${
+      className={`relative w-72 rounded-xl border bg-card shadow-sm ${
         selected ? "border-primary ring-2 ring-primary/30" : "border-border"
       }`}
     >
-      <Handle type="target" position={Position.Left} className="!size-2.5 !bg-muted-foreground/50 !border-2 !border-card" />
+      <Handle type="target" position={Position.Left} className="!inset-0 !size-full !translate-none !rounded-xl !border-0 !bg-transparent" />
+      <span className="pointer-events-none absolute top-1/2 left-0 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card bg-muted-foreground/50" />
       <div className="flex items-center gap-2 border-b px-3 py-2">
         <span className="flex size-6 items-center justify-center rounded-md text-[10px] font-bold text-cyan-600 bg-cyan-500/10">
           A/B
