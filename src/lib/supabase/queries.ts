@@ -347,6 +347,32 @@ export async function listAnalyticsEvents(supabase: SupabaseClient, quizId: stri
   return (data ?? []) as { event_type: "view" | "start" | "complete"; created_at: string }[];
 }
 
+export interface QuestionDropoff {
+  totalSessions: number;
+  completedSessions: number;
+  reachedByStep: number[];
+}
+
+// step i's "reached" count = sessions whose step_index is >= i, i.e. they were
+// at or past that step when we last heard from them (including completed
+// ones, whose final step_index already covers every step). Demo-simulated
+// sessions are excluded so this reflects real visitor behavior only.
+export async function getQuestionDropoff(supabase: SupabaseClient, quizId: string, stepCount: number): Promise<QuestionDropoff> {
+  const { data, error } = await supabase
+    .from("quiz_sessions")
+    .select("step_index, status")
+    .eq("quiz_id", quizId)
+    .eq("is_demo", false);
+  if (error) throw error;
+  const rows = (data ?? []) as { step_index: number; status: "active" | "completed" }[];
+  const reachedByStep = Array.from({ length: stepCount }, (_, i) => rows.filter((r) => r.step_index >= i).length);
+  return {
+    totalSessions: rows.length,
+    completedSessions: rows.filter((r) => r.status === "completed").length,
+    reachedByStep,
+  };
+}
+
 export async function recordAnalyticsEvent(
   supabase: SupabaseClient,
   quizId: string,
