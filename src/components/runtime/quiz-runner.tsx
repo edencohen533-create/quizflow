@@ -13,6 +13,7 @@ import { fireTrackingEvent } from "@/lib/tracking-runtime";
 import { QuizTrackingEvent, QuizTrackingSettings, QuizSessionAnswer } from "@/lib/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SunAvatar } from "@/components/runtime/sun-avatar";
+import { renderRichText } from "@/lib/rich-text";
 
 type Palette = ReturnType<typeof buildPalette>;
 
@@ -302,9 +303,9 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
       <style>{`.qf-runner-bg{background:${desktopBg};}@media (max-width:767px){.qf-runner-bg{background:${mobileBg};}}`}</style>
       <div className="mx-auto max-w-2xl px-4 pb-32 pt-6 sm:px-6">
         {quiz.theme.logoUrl && (
-          <div className="mb-6 flex items-center justify-center rounded-[28px] bg-white py-8 shadow-sm">
+          <div className="mb-6 flex items-center justify-center rounded-[28px] bg-white px-8 py-10 shadow-sm">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={quiz.theme.logoUrl} alt={quiz.name} className="h-14 object-contain" />
+            <img src={quiz.theme.logoUrl} alt={quiz.name} className="h-24 max-w-full object-contain" />
           </div>
         )}
 
@@ -393,8 +394,8 @@ function BotNodeContent({ node, params }: { node: QuizNode; params: Record<strin
   if (node.data.kind === "message") {
     return (
       <div className="space-y-2 whitespace-pre-line">
-        {node.data.title && <p className="font-bold">{interpolateParams(node.data.title, params)}</p>}
-        <p>{interpolateParams(node.data.text, params)}</p>
+        {node.data.title && <p>{renderRichText(interpolateParams(node.data.title, params))}</p>}
+        <p>{renderRichText(interpolateParams(node.data.text, params))}</p>
       </div>
     );
   }
@@ -403,7 +404,7 @@ function BotNodeContent({ node, params }: { node: QuizNode; params: Record<strin
       // eslint-disable-next-line @next/next/no-img-element
       <img key="image" src={node.data.imageUrl} alt="" className="w-full rounded-xl object-cover" />
     );
-    const title = <p key="title" className="whitespace-pre-line font-bold">{interpolateParams(node.data.title, params)}</p>;
+    const title = <p key="title" className="whitespace-pre-line">{renderRichText(interpolateParams(node.data.title, params))}</p>;
     return (
       <div className="space-y-2">
         {node.data.imagePosition === "below" ? [title, image] : [image, title]}
@@ -723,8 +724,8 @@ function ResultCard({
         <div className="mb-3 flex justify-center">
           <Avatar url={avatarUrl} size={48} />
         </div>
-        <h2 className="whitespace-pre-line text-xl font-bold">{interpolateParams(data.title, params)}</h2>
-        <p className="mt-2 whitespace-pre-line leading-relaxed">{interpolateParams(data.text, params)}</p>
+        <h2 className="whitespace-pre-line text-xl">{renderRichText(interpolateParams(data.title, params))}</h2>
+        <p className="mt-2 whitespace-pre-line leading-relaxed">{renderRichText(interpolateParams(data.text, params))}</p>
         {shouldRedirect && (
           <p className="mt-3 text-xs" style={{ color: PALETTE.muted }}>מעביר אותך אוטומטית תוך {secondsLeft} שניות...</p>
         )}
