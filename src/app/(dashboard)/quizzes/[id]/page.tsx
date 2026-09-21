@@ -11,7 +11,6 @@ import { QuizStatusBadge } from "@/components/shared/status-badges";
 import { createClient } from "@/lib/supabase/client";
 import { fetchQuizFull, updateQuizMeta } from "@/lib/supabase/queries";
 import { FlowEditor } from "@/components/editor/flow-editor";
-import { ComingSoonTab } from "@/components/editor/coming-soon-tab";
 import { Quiz } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -39,6 +38,10 @@ const ShareTab = dynamic(() => import("@/components/editor/share-tab").then((m) 
   loading: TabLoading,
 });
 const TrackingTab = dynamic(() => import("@/components/editor/tracking-tab").then((m) => m.TrackingTab), {
+  ssr: false,
+  loading: TabLoading,
+});
+const IntegrationsTab = dynamic(() => import("@/components/editor/integrations-tab").then((m) => m.IntegrationsTab), {
   ssr: false,
   loading: TabLoading,
 });
@@ -181,7 +184,7 @@ export default function QuizEditorPage({ params }: { params: Promise<{ id: strin
           <TrackingTab quiz={quiz} />
         </TabsContent>
         <TabsContent value="integrations" className="flex-1 min-h-0 m-0 overflow-auto">
-          <ComingSoonTab title="אינטגרציות" description="חיבור Webhook, Zapier ופיקסלים לשאלון הזה יתווסף בשלב הבא. בינתיים אפשר להגדיר Webhook כללי בעמוד האינטגרציות הראשי." />
+          <IntegrationsTab quiz={quiz} />
         </TabsContent>
         <TabsContent value="analytics" className="flex-1 min-h-0 m-0 overflow-auto">
           <AnalyticsTab quiz={quiz} />

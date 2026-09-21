@@ -407,6 +407,7 @@ export async function recordAnalyticsEvent(
 interface IntegrationRow {
   id: string;
   workspace_id: string;
+  quiz_id: string | null;
   kind: IntegrationKind;
   name: string;
   enabled: boolean;
@@ -423,6 +424,7 @@ function integrationRowToIntegration(row: IntegrationRow): Integration {
   return {
     id: row.id,
     workspaceId: row.workspace_id,
+    quizId: row.quiz_id ?? undefined,
     kind: row.kind,
     name: row.name,
     enabled: row.enabled,
@@ -436,11 +438,14 @@ function integrationRowToIntegration(row: IntegrationRow): Integration {
   };
 }
 
-export async function listIntegrations(supabase: SupabaseClient, workspaceId: string): Promise<Integration[]> {
+// Integrations are configured per quiz (not per workspace) — quizId scopes
+// which bot's webhooks/pixels these are; workspaceId is still required
+// alongside it purely because RLS checks workspace ownership.
+export async function listIntegrationsForQuiz(supabase: SupabaseClient, quizId: string): Promise<Integration[]> {
   const { data, error } = await supabase
     .from("integrations")
     .select("*")
-    .eq("workspace_id", workspaceId)
+    .eq("quiz_id", quizId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map(integrationRowToIntegration);
@@ -449,12 +454,14 @@ export async function listIntegrations(supabase: SupabaseClient, workspaceId: st
 export async function addIntegration(
   supabase: SupabaseClient,
   workspaceId: string,
+  quizId: string,
   input: { kind: IntegrationKind; name: string; url?: string; secret?: string; pixelId?: string }
 ): Promise<Integration> {
   const { data, error } = await supabase
     .from("integrations")
     .insert({
       workspace_id: workspaceId,
+      quiz_id: quizId,
       kind: input.kind,
       name: input.name,
       url: input.url ?? null,

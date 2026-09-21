@@ -296,6 +296,7 @@ export type IntegrationKind = "webhook" | "meta_pixel" | "tiktok_pixel";
 export interface Integration {
   id: string;
   workspaceId: string;
+  quizId?: string;
   kind: IntegrationKind;
   name: string;
   enabled: boolean;

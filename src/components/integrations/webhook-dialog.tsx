@@ -18,11 +18,13 @@ export function WebhookDialog({
   open,
   onOpenChange,
   workspaceId,
+  quizId,
   onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   workspaceId: string;
+  quizId: string;
   onCreated?: () => void;
 }) {
   const [name, setName] = useState("");
@@ -38,7 +40,7 @@ export function WebhookDialog({
   async function handleCreate() {
     if (!name.trim() || !url.trim()) return;
     const supabase = createClient();
-    await addIntegration(supabase, workspaceId, { kind: "webhook", name: name.trim(), url: url.trim(), secret: secret.trim() || undefined });
+    await addIntegration(supabase, workspaceId, quizId, { kind: "webhook", name: name.trim(), url: url.trim(), secret: secret.trim() || undefined });
     onOpenChange(false);
     reset();
     onCreated?.();
