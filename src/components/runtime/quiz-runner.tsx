@@ -107,6 +107,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   const startedRef = useRef(false);
   const submittedRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const activeNodeRef = useRef<HTMLDivElement>(null);
 
   const firstNode = useMemo(() => {
     const start = getStartNode(quiz);
@@ -215,8 +216,14 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [entries]);
+    // Land the new active question near the middle of the screen instead of
+    // pinned to the very bottom, so it doesn't feel like it's hiding at the edge.
+    if (activeNodeId && activeNodeRef.current) {
+      activeNodeRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [entries, activeNodeId]);
 
   function scrollToBottom() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -349,7 +356,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
             const isActive = entry.nodeId === activeNodeId;
 
             return (
-              <div key={entry.id} className="flex flex-col items-end gap-1">
+              <div key={entry.id} ref={isActive ? activeNodeRef : undefined} className="flex flex-col items-end gap-1">
                 <div className="flex items-end gap-2">
                   <Avatar url={quiz.theme.avatarUrl} />
                   <div
