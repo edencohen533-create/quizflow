@@ -75,6 +75,8 @@ export interface NameNodeData {
 
 export interface LeadDetailsNodeData {
   kind: "lead_details";
+  // shown above the form fields; falls back to a default line when unset
+  title?: string;
   showName: boolean;
   showPhone: boolean;
   showEmail: boolean;
