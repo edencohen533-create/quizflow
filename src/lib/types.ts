@@ -49,7 +49,7 @@ export interface MessageNodeData {
 export interface QuestionNodeData {
   kind: "question";
   title: string;
-  description?: string;
+  imageUrl?: string;
   answerType: QuestionAnswerType;
   required: boolean;
   allowOther: boolean;
