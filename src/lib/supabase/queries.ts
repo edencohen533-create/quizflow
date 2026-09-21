@@ -216,6 +216,19 @@ export async function saveFlow(supabase: SupabaseClient, quizId: string, nodes: 
 
 // ---------------- Leads ----------------
 
+// Lightweight variant for screens that only need per-quiz lead counts (e.g.
+// the quizzes list's "X leads this month" stat) — avoids listLeads()'s full
+// fetch (notes/history/answers batched per lead) when only quiz_id and
+// created_at are needed.
+export async function listLeadCounts(supabase: SupabaseClient, workspaceId: string): Promise<{ quizId: string; createdAt: string }[]> {
+  const { data, error } = await supabase
+    .from("leads")
+    .select("quiz_id, created_at")
+    .eq("workspace_id", workspaceId);
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ quizId: r.quiz_id as string, createdAt: r.created_at as string }));
+}
+
 export async function listLeads(supabase: SupabaseClient, workspaceId: string): Promise<Lead[]> {
   const { data: leadRows, error } = await supabase
     .from("leads")
