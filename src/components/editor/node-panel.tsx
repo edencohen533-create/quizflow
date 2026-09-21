@@ -208,6 +208,17 @@ function QuestionForm({ data, onChange }: { data: QuestionNodeData; onChange: (d
           <Switch checked={data.allowOther} onCheckedChange={(v) => onChange({ ...data, allowOther: v })} />
         </div>
       )}
+      {isChoice && (
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-muted-foreground">כל התשובות ממשיכות לאותו מקום</Label>
+          <Switch checked={data.combineAnswers} onCheckedChange={(v) => onChange({ ...data, combineAnswers: v })} />
+        </div>
+      )}
+      {isChoice && data.combineAnswers && (
+        <p className="text-xs text-muted-foreground -mt-2">
+          יופיע חיבור יוצא אחד בלבד לצומת, במקום חיבור נפרד לכל אפשרות.
+        </p>
+      )}
       <Field label="מפתח לשליחה ב-Webhook (אופציונלי)">
         <Input
           dir="ltr"

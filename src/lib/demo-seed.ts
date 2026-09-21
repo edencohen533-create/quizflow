@@ -21,6 +21,7 @@ const nodes: QuizNode[] = [
     answerType: "single_choice",
     required: true,
     allowOther: false,
+    combineAnswers: false,
     options: [
       { id: "o1", label: "עד 30", value: "under_30", score: 2, nextNodeId: "q-field" },
       { id: "o2", label: "31–45", value: "31_45", score: 5, nextNodeId: "q-field" },
@@ -35,6 +36,7 @@ const nodes: QuizNode[] = [
     answerType: "single_choice",
     required: true,
     allowOther: true,
+    combineAnswers: false,
     options: [
       { id: "o1", label: "שכיר", value: "employee", score: 4, nextNodeId: "q-income" },
       { id: "o2", label: "עצמאי", value: "self_employed", score: 7, nextNodeId: "q-income" },
@@ -49,6 +51,7 @@ const nodes: QuizNode[] = [
     answerType: "single_choice",
     required: true,
     allowOther: false,
+    combineAnswers: false,
     options: [
       { id: "o1", label: "עד 10,000 ₪", value: "under_10k", score: 2, nextNodeId: "q-priority" },
       { id: "o2", label: "10,000–20,000 ₪", value: "10_20k", score: 5, nextNodeId: "q-priority" },
@@ -63,6 +66,7 @@ const nodes: QuizNode[] = [
     answerType: "single_choice",
     required: true,
     allowOther: false,
+    combineAnswers: false,
     options: [
       { id: "o1", label: "חיסכון לפנסיה", value: "pension", score: 6, nextNodeId: "lead-1" },
       { id: "o2", label: "השקעות", value: "investing", score: 8, nextNodeId: "lead-1" },

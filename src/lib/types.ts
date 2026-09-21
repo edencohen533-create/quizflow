@@ -50,6 +50,8 @@ export interface QuestionNodeData {
   required: boolean;
   allowOther: boolean;
   options: QuestionOption[];
+  // when true, all options share one exit connection instead of one per option
+  combineAnswers: boolean;
   // used for non-choice answer types (text/number/rating/date) — single continuation
   nextNodeId: string | null;
   // JSON key this answer is sent under to webhooks (e.g. "age"); falls back to the node id when unset
