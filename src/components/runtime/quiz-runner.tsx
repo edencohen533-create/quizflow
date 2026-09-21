@@ -385,13 +385,14 @@ function BotNodeContent({ node }: { node: QuizNode }) {
     );
   }
   if (node.data.kind === "question") {
+    const image = node.data.imageUrl && (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img key="image" src={node.data.imageUrl} alt="" className="w-full rounded-xl object-cover" />
+    );
+    const title = <p key="title" className="font-bold">{node.data.title}</p>;
     return (
       <div className="space-y-2">
-        {node.data.imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={node.data.imageUrl} alt="" className="w-full rounded-xl object-cover" />
-        )}
-        <p className="font-bold">{node.data.title}</p>
+        {node.data.imagePosition === "below" ? [title, image] : [image, title]}
       </div>
     );
   }

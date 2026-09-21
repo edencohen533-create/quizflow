@@ -1,6 +1,7 @@
 "use client";
 
-import { Plus, Trash2, Copy, X } from "lucide-react";
+import { useState } from "react";
+import { Plus, Trash2, Copy, X, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -171,6 +172,50 @@ const ANSWER_TYPES: { value: QuestionAnswerType; label: string }[] = [
   { value: "date", label: "תאריך" },
 ];
 
+function QuestionContentBlocks({ data, onChange }: { data: QuestionNodeData; onChange: (d: QuizNodeData) => void }) {
+  const imageFirst = data.imagePosition !== "below";
+  const blocks: Array<"image" | "text"> = imageFirst ? ["image", "text"] : ["text", "image"];
+  const [draggingBlock, setDraggingBlock] = useState<"image" | "text" | null>(null);
+
+  function handleDrop(target: "image" | "text") {
+    if (draggingBlock && draggingBlock !== target) {
+      onChange({ ...data, imagePosition: imageFirst ? "below" : "above" });
+    }
+    setDraggingBlock(null);
+  }
+
+  return (
+    <div className="space-y-2">
+      {blocks.map((block) => (
+        <div
+          key={block}
+          draggable
+          onDragStart={() => setDraggingBlock(block)}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={() => handleDrop(block)}
+          className="rounded-lg border border-dashed p-2 space-y-1.5"
+        >
+          <div className="flex items-center gap-1 cursor-grab text-muted-foreground active:cursor-grabbing">
+            <GripVertical className="size-3.5" />
+            <span className="text-xs">{block === "image" ? "תמונה (אופציונלי)" : "השאלה"}</span>
+          </div>
+          {block === "image" ? (
+            <ImageUploadField value={data.imageUrl ?? ""} onChange={(url) => onChange({ ...data, imageUrl: url })} />
+          ) : (
+            <Textarea
+              rows={5}
+              value={data.title}
+              onChange={(e) => onChange({ ...data, title: e.target.value })}
+              placeholder="מה השאלה?"
+            />
+          )}
+        </div>
+      ))}
+      <p className="text-xs text-muted-foreground">גררו לפי הידית כדי לשנות את סדר התמונה ביחס לשאלה.</p>
+    </div>
+  );
+}
+
 function QuestionForm({ data, onChange }: { data: QuestionNodeData; onChange: (d: QuizNodeData) => void }) {
   const isChoice = data.answerType === "single_choice" || data.answerType === "multi_choice";
 
@@ -189,12 +234,7 @@ function QuestionForm({ data, onChange }: { data: QuestionNodeData; onChange: (d
 
   return (
     <>
-      <Field label="השאלה">
-        <Input value={data.title} onChange={(e) => onChange({ ...data, title: e.target.value })} />
-      </Field>
-      <Field label="תמונה (אופציונלי)">
-        <ImageUploadField value={data.imageUrl ?? ""} onChange={(url) => onChange({ ...data, imageUrl: url })} />
-      </Field>
+      <QuestionContentBlocks data={data} onChange={onChange} />
       <Field label="סוג תשובה">
         <Select
           value={data.answerType}
