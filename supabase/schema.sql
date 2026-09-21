@@ -112,6 +112,8 @@ create table if not exists public.lead_status_history (
   created_at timestamptz not null default now()
 );
 
+create index if not exists lead_status_history_lead_id_idx on public.lead_status_history(lead_id);
+
 create table if not exists public.lead_notes (
   id uuid primary key default gen_random_uuid(),
   lead_id uuid not null references public.leads(id) on delete cascade,
@@ -119,6 +121,8 @@ create table if not exists public.lead_notes (
   created_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now()
 );
+
+create index if not exists lead_notes_lead_id_idx on public.lead_notes(lead_id);
 
 create table if not exists public.quiz_submissions (
   id uuid primary key default gen_random_uuid(),
@@ -133,6 +137,7 @@ create table if not exists public.quiz_submissions (
 );
 
 create index if not exists quiz_submissions_quiz_id_idx on public.quiz_submissions(quiz_id);
+create index if not exists quiz_submissions_lead_id_idx on public.quiz_submissions(lead_id);
 
 create table if not exists public.submission_answers (
   id uuid primary key default gen_random_uuid(),
@@ -143,6 +148,8 @@ create table if not exists public.submission_answers (
   score integer not null default 0,
   param_key text
 );
+
+create index if not exists submission_answers_submission_id_idx on public.submission_answers(submission_id);
 
 -- ============================================================
 -- 4. integrations + analytics
@@ -873,3 +880,16 @@ alter table public.quiz_themes add column if not exists background_image_url_mob
 -- ============================================================
 
 alter table public.leads add column if not exists utm_content text;
+
+-- ============================================================
+-- 15. Missing indexes on foreign-key columns that listLeads() and the
+--     webhook dispatch route filter on with .in()/.eq() — Postgres does
+--     not auto-index the referencing side of a foreign key, so these
+--     were full/sequential scans on every leads-page load and every lead
+--     submission. Pure additive indexes, no behavior change.
+-- ============================================================
+
+create index if not exists lead_status_history_lead_id_idx on public.lead_status_history(lead_id);
+create index if not exists lead_notes_lead_id_idx on public.lead_notes(lead_id);
+create index if not exists quiz_submissions_lead_id_idx on public.quiz_submissions(lead_id);
+create index if not exists submission_answers_submission_id_idx on public.submission_answers(submission_id);

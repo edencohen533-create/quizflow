@@ -7,14 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
-import { getWorkspaceId, updateProfileName, updateWorkspaceName } from "@/lib/supabase/queries";
+import { updateProfileName, updateWorkspaceName } from "@/lib/supabase/queries";
+import { useWorkspaceId } from "@/components/layout/workspace-provider";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
   const supabase = useMemo(() => createClient(), []);
+  const workspaceId = useWorkspaceId();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
@@ -27,12 +28,11 @@ export default function SettingsPage() {
     setEmail(user.email ?? "");
     setFullName((user.user_metadata?.full_name as string | undefined) ?? "");
 
-    const wsId = await getWorkspaceId(supabase);
-    setWorkspaceId(wsId);
-    const { data: ws } = await supabase.from("workspaces").select("name").eq("id", wsId).maybeSingle();
+    if (!workspaceId) return;
+    const { data: ws } = await supabase.from("workspaces").select("name").eq("id", workspaceId).maybeSingle();
     setWorkspaceName(ws?.name ?? "");
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, workspaceId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial client-side data fetch on mount

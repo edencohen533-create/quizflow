@@ -16,7 +16,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { LeadStatusBadge, CategoryBadge } from "@/components/shared/status-badges";
 import { LeadDrawer } from "@/components/leads/lead-drawer";
 import { createClient } from "@/lib/supabase/client";
-import { getWorkspaceId, listLeads } from "@/lib/supabase/queries";
+import { listLeads } from "@/lib/supabase/queries";
+import { useWorkspaceId } from "@/components/layout/workspace-provider";
 import { LEAD_STATUS_LABELS, Lead, LeadStatus } from "@/lib/types";
 
 function exportCsv(leads: Lead[]) {
@@ -44,6 +45,7 @@ function exportCsv(leads: Lead[]) {
 
 export default function LeadsPage() {
   const supabase = useMemo(() => createClient(), []);
+  const workspaceId = useWorkspaceId();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -51,11 +53,11 @@ export default function LeadsPage() {
   const [selected, setSelected] = useState<Lead | null>(null);
 
   const load = useCallback(async () => {
-    const workspaceId = await getWorkspaceId(supabase);
+    if (!workspaceId) return;
     const data = await listLeads(supabase, workspaceId);
     setLeads(data);
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, workspaceId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial client-side data fetch on mount

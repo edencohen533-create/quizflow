@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { KpiCard } from "@/components/dashboard/kpi-card";
-import { LeadsChart } from "@/components/dashboard/leads-chart";
+import { LeadsChart } from "@/components/dashboard/leads-chart-lazy";
 import { QuizStatusBadge, LeadStatusBadge } from "@/components/shared/status-badges";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId, listLeads, listQuizzes } from "@/lib/supabase/queries";

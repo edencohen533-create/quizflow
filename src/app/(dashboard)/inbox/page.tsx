@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { getWorkspaceId } from "@/lib/supabase/queries";
+import { useWorkspaceId } from "@/components/layout/workspace-provider";
 import {
   deleteDemoSessions,
   deleteSession,
@@ -20,22 +20,20 @@ import { SessionDetails } from "@/components/live-sessions/session-details";
 
 export default function InboxPage() {
   const supabase = useMemo(() => createClient(), []);
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const workspaceId = useWorkspaceId();
   const [sessions, setSessions] = useState<QuizSession[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [demoLive, setDemoLive] = useState(false);
   const stopSimulatorRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
+    if (!workspaceId) return;
     (async () => {
-      const wsId = await getWorkspaceId(supabase);
-      setWorkspaceId(wsId);
-      const [list, demo] = await Promise.all([listLiveSessions(supabase, wsId), getDemoLiveEnabled(supabase, wsId)]);
+      const [list, demo] = await Promise.all([listLiveSessions(supabase, workspaceId), getDemoLiveEnabled(supabase, workspaceId)]);
       setSessions(list);
       setDemoLive(demo);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [supabase, workspaceId]);
 
   useEffect(() => {
     if (!workspaceId) return;
