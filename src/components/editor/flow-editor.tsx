@@ -51,6 +51,8 @@ function defaultDataFor(type: NodeType): QuizNodeData {
         ],
         nextNodeId: null,
       };
+    case "open_question":
+      return { kind: "open_question", title: "שאלה פתוחה חדשה", required: true, longAnswer: false, nextNodeId: null };
     case "name":
       return { kind: "name", title: "איך קוראים לך?", placeholder: "השם שלך", required: true, nextNodeId: null };
     case "lead_details":
