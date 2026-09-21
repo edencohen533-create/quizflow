@@ -420,9 +420,23 @@ function NodeControls({
   const [text, setText] = useState("");
   const [multi, setMulti] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const autoAdvanceFiredRef = useRef(false);
+
+  useEffect(() => {
+    if (node.data.kind !== "message" || !node.data.autoAdvance) return;
+    const data = node.data;
+    const timer = setTimeout(() => {
+      if (autoAdvanceFiredRef.current) return;
+      autoAdvanceFiredRef.current = true;
+      onComplete(data.buttonLabel || "המשך", null);
+    }, Math.max(1, data.autoAdvanceSeconds) * 1000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires once per node, deliberately not re-armed by parent re-renders
+  }, [node.id]);
 
   if (node.data.kind === "message") {
     const data = node.data;
+    if (data.autoAdvance) return null;
     return (
       <button
         onClick={() => onComplete(data.buttonLabel || "המשך", null)}

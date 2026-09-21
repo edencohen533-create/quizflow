@@ -27,6 +27,7 @@ export function MessageNodeRenderer({ selected, data }: NodeProps<WithConnected<
   return (
     <BaseNode type="message" title={data.title || "הודעה"} selected={selected} connected={data._connected}>
       <p className="line-clamp-2">{data.text || "ללא טקסט"}</p>
+      {data.autoAdvance && <p className="mt-1 text-[11px] opacity-70">מעבר אוטומטי אחרי {data.autoAdvanceSeconds} שנ&apos;</p>}
     </BaseNode>
   );
 }

@@ -143,9 +143,24 @@ function MessageForm({ data, onChange }: { data: MessageNodeData; onChange: (d: 
       <Field label="קישור לוידאו (אופציונלי)">
         <Input value={data.videoUrl ?? ""} onChange={(e) => onChange({ ...data, videoUrl: e.target.value })} placeholder="https://" />
       </Field>
-      <Field label="טקסט כפתור המשך">
-        <Input value={data.buttonLabel} onChange={(e) => onChange({ ...data, buttonLabel: e.target.value })} />
-      </Field>
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-muted-foreground">מעבר אוטומטי (בלי כפתור)</Label>
+        <Switch checked={data.autoAdvance} onCheckedChange={(v) => onChange({ ...data, autoAdvance: v })} />
+      </div>
+      {data.autoAdvance ? (
+        <Field label="להציג את ההודעה כמה שניות לפני שממשיכים">
+          <Input
+            type="number"
+            min={1}
+            value={data.autoAdvanceSeconds}
+            onChange={(e) => onChange({ ...data, autoAdvanceSeconds: Math.max(1, Number(e.target.value) || 1) })}
+          />
+        </Field>
+      ) : (
+        <Field label="טקסט כפתור המשך">
+          <Input value={data.buttonLabel} onChange={(e) => onChange({ ...data, buttonLabel: e.target.value })} />
+        </Field>
+      )}
     </>
   );
 }
