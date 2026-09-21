@@ -49,6 +49,8 @@ export interface QuestionNodeData {
   kind: "question";
   title: string;
   imageUrl?: string;
+  // where the image sits relative to the question text; defaults to "above" when unset
+  imagePosition?: "above" | "below";
   answerType: QuestionAnswerType;
   required: boolean;
   allowOther: boolean;
