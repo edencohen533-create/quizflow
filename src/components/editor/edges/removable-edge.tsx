@@ -1,8 +1,30 @@
-import { EdgeLabelRenderer, BaseEdge, EdgeProps, getSmoothStepPath, useReactFlow } from "reactflow";
+import { EdgeLabelRenderer, BaseEdge, EdgeProps, Position, getSmoothStepPath, useReactFlow, Node } from "reactflow";
 import { X } from "lucide-react";
+
+// Ignores exactly where a connection was dragged from/to and anchors it to
+// the node's own left/right-center instead, so every edge into or out of a
+// block lands on the same fixed point no matter where inside it you drag.
+function nodeAnchor(node: Node | undefined, position: Position, fallback: { x: number; y: number }) {
+  if (!node || node.width == null || node.height == null) return fallback;
+  const { x, y } = node.positionAbsolute ?? node.position;
+  switch (position) {
+    case Position.Left:
+      return { x, y: y + node.height / 2 };
+    case Position.Right:
+      return { x: x + node.width, y: y + node.height / 2 };
+    case Position.Top:
+      return { x: x + node.width / 2, y };
+    case Position.Bottom:
+      return { x: x + node.width / 2, y: y + node.height };
+    default:
+      return fallback;
+  }
+}
 
 export function RemovableEdge({
   id,
+  source,
+  target,
   sourceX,
   sourceY,
   targetX,
@@ -13,13 +35,15 @@ export function RemovableEdge({
   markerEnd,
   selected,
 }: EdgeProps) {
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, getNode } = useReactFlow();
+  const sourceAnchor = nodeAnchor(getNode(source), sourcePosition, { x: sourceX, y: sourceY });
+  const targetAnchor = nodeAnchor(getNode(target), targetPosition, { x: targetX, y: targetY });
   const [edgePath, labelX, labelY] = getSmoothStepPath({
-    sourceX,
-    sourceY,
+    sourceX: sourceAnchor.x,
+    sourceY: sourceAnchor.y,
     sourcePosition,
-    targetX,
-    targetY,
+    targetX: targetAnchor.x,
+    targetY: targetAnchor.y,
     targetPosition,
   });
 
