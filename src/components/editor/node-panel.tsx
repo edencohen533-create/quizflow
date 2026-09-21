@@ -40,18 +40,49 @@ function sanitizeParamKey(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
 }
 
+function appendToken(current: string, token: string) {
+  if (!current) return token;
+  return current.endsWith(" ") || current.endsWith("\n") ? current + token : `${current} ${token}`;
+}
+
+type AvailableParam = { key: string; label: string };
+
+// Lets a message/question/end block reference an answer captured earlier
+// in the flow (e.g. {{name}}) — clicking a chip appends its token to the
+// field; the live bot fills it in with the visitor's actual answer.
+function ParamChips({ params, onInsert }: { params: AvailableParam[]; onInsert: (token: string) => void }) {
+  if (params.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {params.map((p) => (
+        <button
+          key={p.key}
+          type="button"
+          onClick={() => onInsert(`{{${p.key}}}`)}
+          title={p.label}
+          className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        >
+          {`{{${p.key}}}`}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function NodePanel({
   node,
   onChange,
   onDelete,
   onDuplicate,
   onClose,
+  availableParams,
 }: {
   node: QuizNode;
   onChange: (data: QuizNodeData) => void;
   onDelete: () => void;
   onDuplicate: () => void;
   onClose: () => void;
+  availableParams: AvailableParam[];
 }) {
   const meta = NODE_META[node.type];
 
@@ -85,10 +116,10 @@ export function NodePanel({
           <p className="text-sm text-muted-foreground">זוהי נקודת ההתחלה של השאלון. לא ניתן לערוך או למחוק אותה.</p>
         )}
         {node.data.kind === "message" && (
-          <MessageForm data={node.data} onChange={onChange} />
+          <MessageForm data={node.data} onChange={onChange} availableParams={availableParams} />
         )}
         {node.data.kind === "question" && (
-          <QuestionForm data={node.data} onChange={onChange} />
+          <QuestionForm data={node.data} onChange={onChange} availableParams={availableParams} />
         )}
         {node.data.kind === "name" && (
           <NameForm data={node.data} onChange={onChange} />
@@ -109,7 +140,7 @@ export function NodePanel({
           <ActionForm data={node.data} onChange={onChange} />
         )}
         {node.data.kind === "end" && (
-          <EndForm data={node.data} onChange={onChange} />
+          <EndForm data={node.data} onChange={onChange} availableParams={availableParams} />
         )}
       </div>
     </aside>
@@ -125,7 +156,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function MessageForm({ data, onChange }: { data: MessageNodeData; onChange: (d: QuizNodeData) => void }) {
+function MessageForm({ data, onChange, availableParams }: { data: MessageNodeData; onChange: (d: QuizNodeData) => void; availableParams: AvailableParam[] }) {
   return (
     <>
       <Field label="כותרת">
@@ -133,6 +164,7 @@ function MessageForm({ data, onChange }: { data: MessageNodeData; onChange: (d: 
       </Field>
       <Field label="טקסט">
         <Textarea rows={4} value={data.text} onChange={(e) => onChange({ ...data, text: e.target.value })} />
+        <ParamChips params={availableParams} onInsert={(token) => onChange({ ...data, text: appendToken(data.text, token) })} />
       </Field>
       <Field label="תמונה (אופציונלי)">
         <ImageUploadField value={data.imageUrl ?? ""} onChange={(url) => onChange({ ...data, imageUrl: url })} />
@@ -172,7 +204,7 @@ const ANSWER_TYPES: { value: QuestionAnswerType; label: string }[] = [
   { value: "date", label: "תאריך" },
 ];
 
-function QuestionContentBlocks({ data, onChange }: { data: QuestionNodeData; onChange: (d: QuizNodeData) => void }) {
+function QuestionContentBlocks({ data, onChange, availableParams }: { data: QuestionNodeData; onChange: (d: QuizNodeData) => void; availableParams: AvailableParam[] }) {
   const imageFirst = data.imagePosition !== "below";
   const blocks: Array<"image" | "text"> = imageFirst ? ["image", "text"] : ["text", "image"];
   const [draggingBlock, setDraggingBlock] = useState<"image" | "text" | null>(null);
@@ -202,12 +234,15 @@ function QuestionContentBlocks({ data, onChange }: { data: QuestionNodeData; onC
           {block === "image" ? (
             <ImageUploadField value={data.imageUrl ?? ""} onChange={(url) => onChange({ ...data, imageUrl: url })} />
           ) : (
-            <Textarea
-              rows={5}
-              value={data.title}
-              onChange={(e) => onChange({ ...data, title: e.target.value })}
-              placeholder="מה השאלה?"
-            />
+            <>
+              <Textarea
+                rows={5}
+                value={data.title}
+                onChange={(e) => onChange({ ...data, title: e.target.value })}
+                placeholder="מה השאלה?"
+              />
+              <ParamChips params={availableParams} onInsert={(token) => onChange({ ...data, title: appendToken(data.title, token) })} />
+            </>
           )}
         </div>
       ))}
@@ -216,7 +251,7 @@ function QuestionContentBlocks({ data, onChange }: { data: QuestionNodeData; onC
   );
 }
 
-function QuestionForm({ data, onChange }: { data: QuestionNodeData; onChange: (d: QuizNodeData) => void }) {
+function QuestionForm({ data, onChange, availableParams }: { data: QuestionNodeData; onChange: (d: QuizNodeData) => void; availableParams: AvailableParam[] }) {
   const isChoice = data.answerType === "single_choice" || data.answerType === "multi_choice";
 
   function updateOption(id: string, patch: Partial<QuestionNodeData["options"][number]>) {
@@ -234,7 +269,7 @@ function QuestionForm({ data, onChange }: { data: QuestionNodeData; onChange: (d
 
   return (
     <>
-      <QuestionContentBlocks data={data} onChange={onChange} />
+      <QuestionContentBlocks data={data} onChange={onChange} availableParams={availableParams} />
       <Field label="סוג תשובה">
         <Select
           value={data.answerType}
@@ -483,7 +518,7 @@ function ActionForm({ data, onChange }: { data: ActionNodeData; onChange: (d: Qu
   );
 }
 
-function EndForm({ data, onChange }: { data: EndNodeData; onChange: (d: QuizNodeData) => void }) {
+function EndForm({ data, onChange, availableParams }: { data: EndNodeData; onChange: (d: QuizNodeData) => void; availableParams: AvailableParam[] }) {
   return (
     <>
       <Field label="כותרת">
@@ -491,6 +526,7 @@ function EndForm({ data, onChange }: { data: EndNodeData; onChange: (d: QuizNode
       </Field>
       <Field label="טקסט סיום">
         <Textarea rows={3} value={data.text} onChange={(e) => onChange({ ...data, text: e.target.value })} />
+        <ParamChips params={availableParams} onInsert={(token) => onChange({ ...data, text: appendToken(data.text, token) })} />
       </Field>
       <Field label="טקסט כפתור CTA (אופציונלי)">
         <Input value={data.ctaLabel ?? ""} onChange={(e) => onChange({ ...data, ctaLabel: e.target.value })} />

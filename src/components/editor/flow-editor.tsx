@@ -270,6 +270,25 @@ function FlowEditorInner({
     return { id: flowNode.id, type: flowNode.type as NodeType, position: flowNode.position, data: rest as QuizNodeData };
   }, [nodes, selectedNodeId]);
 
+  // Params captured earlier in the flow (question/name blocks with a param
+  // key set) that a later message/question/end block can reference as
+  // {{key}} — interpolated with the visitor's actual answer when the bot runs.
+  const availableParams = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const n of nodes) {
+      const d = n.data as QuizNodeData;
+      if ((d.kind === "question" || d.kind === "name") && d.paramKey) {
+        seen.set(d.paramKey, d.title || d.paramKey);
+      }
+    }
+    return [
+      { key: "name", label: "שם (מובנה)" },
+      { key: "phone", label: "טלפון (מובנה)" },
+      { key: "email", label: "אימייל (מובנה)" },
+      ...Array.from(seen, ([key, label]) => ({ key, label })),
+    ];
+  }, [nodes]);
+
   function updateSelectedNodeData(data: QuizNodeData) {
     if (!selectedNodeId) return;
     setNodes((nds) => {
@@ -409,6 +428,7 @@ function FlowEditorInner({
           onDelete={deleteSelectedNode}
           onDuplicate={duplicateSelectedNode}
           onClose={() => setSelectedNodeId(null)}
+          availableParams={availableParams}
         />
       )}
     </div>
