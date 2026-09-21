@@ -1,6 +1,7 @@
 import { Handle, NodeProps, Position } from "reactflow";
 import { BaseNode } from "./base-node";
 import {
+  AbTestNodeData,
   ActionNodeData,
   ConditionNodeData,
   EndNodeData,
@@ -101,6 +102,43 @@ export function LeadDetailsNodeRenderer({ selected, data }: NodeProps<WithConnec
   );
 }
 
+export function AbTestNodeRenderer({ selected, data }: NodeProps<WithConnected<AbTestNodeData>>) {
+  const branches: { id: "a" | "b"; label: string; percent: number }[] = [
+    { id: "a", label: "וריאנט A", percent: data.splitPercent },
+    { id: "b", label: "וריאנט B", percent: 100 - data.splitPercent },
+  ];
+  return (
+    <div
+      className={`w-72 rounded-xl border bg-card shadow-sm ${
+        selected ? "border-primary ring-2 ring-primary/30" : "border-border"
+      }`}
+    >
+      <Handle type="target" position={Position.Top} className="!size-2.5 !bg-muted-foreground/50 !border-2 !border-card" />
+      <div className="flex items-center gap-2 border-b px-3 py-2">
+        <span className="flex size-6 items-center justify-center rounded-md text-[10px] font-bold text-cyan-600 bg-cyan-500/10">
+          A/B
+        </span>
+        <span className="text-xs font-semibold flex-1 truncate">בדיקת A/B</span>
+        {!data._connected && <span className="size-1.5 rounded-full bg-amber-500 shrink-0" />}
+      </div>
+      <div className="py-1.5">
+        {branches.map((b) => (
+          <div key={b.id} className="relative flex items-center justify-between px-3 py-1.5 text-xs hover:bg-accent/50">
+            <span className="truncate">{b.label} · {b.percent}%</span>
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={b.id}
+              style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", right: -8 }}
+              className="!size-2.5 !bg-primary !border-2 !border-card"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ConditionNodeRenderer({ selected, data }: NodeProps<WithConnected<ConditionNodeData>>) {
   return (
     <BaseNode type="condition" title="תנאי" selected={selected} connected={data._connected}>
@@ -149,6 +187,7 @@ export const nodeTypes = {
   name: NameNodeRenderer,
   lead_details: LeadDetailsNodeRenderer,
   condition: ConditionNodeRenderer,
+  ab_test: AbTestNodeRenderer,
   score: ScoreNodeRenderer,
   action: ActionNodeRenderer,
   end: EndNodeRenderer,
