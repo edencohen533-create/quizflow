@@ -207,16 +207,9 @@ function Field({ label, action, children }: { label: string; action?: React.Reac
 }
 
 function MessageForm({ data, onChange, availableParams }: { data: MessageNodeData; onChange: (d: QuizNodeData) => void; availableParams: AvailableParam[] }) {
-  const titleRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
   return (
     <>
-      <Field
-        label="כותרת"
-        action={<RichTextToolbar fieldRef={titleRef} value={data.title} onChange={(v) => onChange({ ...data, title: v })} />}
-      >
-        <Input ref={titleRef} value={data.title} onChange={(e) => onChange({ ...data, title: e.target.value })} />
-      </Field>
       <Field
         label="טקסט"
         action={<RichTextToolbar fieldRef={textRef} value={data.text} onChange={(v) => onChange({ ...data, text: v })} />}

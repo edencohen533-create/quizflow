@@ -69,7 +69,7 @@ function uid() {
 function titleForNode(node: QuizNode): string {
   switch (node.data.kind) {
     case "message":
-      return node.data.title || node.data.text || "הודעה";
+      return node.data.text || "הודעה";
     case "question":
       return node.data.title;
     case "name":
@@ -405,10 +405,7 @@ function BotNodeContent({ node, params }: { node: QuizNode; params: Record<strin
           // eslint-disable-next-line @next/next/no-img-element
           <img src={node.data.imageUrl} alt="" className="w-full rounded-xl object-cover" />
         )}
-        <div className="space-y-2 whitespace-pre-line">
-          {node.data.title && <p>{renderRichText(interpolateParams(node.data.title, params))}</p>}
-          <p>{renderRichText(interpolateParams(node.data.text, params))}</p>
-        </div>
+        <p className="whitespace-pre-line">{renderRichText(interpolateParams(node.data.text, params))}</p>
       </div>
     );
   }

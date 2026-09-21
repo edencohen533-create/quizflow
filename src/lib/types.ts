@@ -33,7 +33,6 @@ export interface StartNodeData {
 
 export interface MessageNodeData {
   kind: "message";
-  title: string;
   text: string;
   imageUrl?: string;
   videoUrl?: string;
