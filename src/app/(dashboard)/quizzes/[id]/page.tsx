@@ -163,7 +163,7 @@ export default function QuizEditorPage({ params }: { params: Promise<{ id: strin
           <ComingSoonTab title="אינטגרציות" description="חיבור Webhook, Zapier ופיקסלים לשאלון הזה יתווסף בשלב הבא. בינתיים אפשר להגדיר Webhook כללי בעמוד האינטגרציות הראשי." />
         </TabsContent>
         <TabsContent value="analytics" className="flex-1 min-h-0 m-0 overflow-auto">
-          <AnalyticsTab quizId={quiz.id} />
+          <AnalyticsTab quiz={quiz} />
         </TabsContent>
         <TabsContent value="share" className="flex-1 min-h-0 m-0 overflow-auto">
           <ShareTab quiz={quiz} />

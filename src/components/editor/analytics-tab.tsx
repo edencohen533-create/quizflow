@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { createClient } from "@/lib/supabase/client";
-import { listAnalyticsEvents } from "@/lib/supabase/queries";
+import { listAnalyticsEvents, getQuestionDropoff, QuestionDropoff } from "@/lib/supabase/queries";
+import { Quiz, QuizNode } from "@/lib/types";
 
 const RANGE_OPTIONS = [
   { value: "today", label: "היום" },
@@ -23,6 +24,27 @@ const RANGE_OPTIONS = [
 
 const RANGE_DAYS: Record<string, number> = { today: 1, week: 7, month: 30, "30": 30, "90": 90 };
 
+const STEP_TYPES = new Set(["question", "open_question", "name", "lead_details"]);
+
+function stepLabel(node: QuizNode): string {
+  switch (node.data.kind) {
+    case "question":
+    case "open_question":
+    case "name":
+      return node.data.title;
+    case "lead_details":
+      return "פרטי יצירת קשר";
+    default:
+      return node.id;
+  }
+}
+
+function orderedSteps(quiz: Quiz): QuizNode[] {
+  return quiz.nodes
+    .filter((n) => STEP_TYPES.has(n.type))
+    .sort((a, b) => a.position.x - b.position.x);
+}
+
 interface DayPoint {
   date: string;
   views: number;
@@ -30,18 +52,21 @@ interface DayPoint {
   completions: number;
 }
 
-export function AnalyticsTab({ quizId }: { quizId: string }) {
+export function AnalyticsTab({ quiz }: { quiz: Quiz }) {
   const supabase = useMemo(() => createClient(), []);
   const [range, setRange] = useState("30");
   const days = RANGE_DAYS[range] ?? 30;
   const [data, setData] = useState<DayPoint[]>([]);
+  const [dropoff, setDropoff] = useState<QuestionDropoff | null>(null);
+
+  const steps = useMemo(() => orderedSteps(quiz), [quiz]);
 
   useEffect(() => {
     let cancelled = false;
     const since = new Date();
     since.setDate(since.getDate() - days);
 
-    listAnalyticsEvents(supabase, quizId, since.toISOString()).then((events) => {
+    listAnalyticsEvents(supabase, quiz.id, since.toISOString()).then((events) => {
       if (cancelled) return;
       const buckets = new Map<string, DayPoint>();
       for (let i = days - 1; i >= 0; i--) {
@@ -64,7 +89,17 @@ export function AnalyticsTab({ quizId }: { quizId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [supabase, quizId, days]);
+  }, [supabase, quiz.id, days]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getQuestionDropoff(supabase, quiz.id, steps.length).then((d) => {
+      if (!cancelled) setDropoff(d);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase, quiz.id, steps.length]);
 
   const totals = data.reduce(
     (acc, p) => ({ views: acc.views + p.views, starts: acc.starts + p.starts, completions: acc.completions + p.completions }),
@@ -72,6 +107,17 @@ export function AnalyticsTab({ quizId }: { quizId: string }) {
   );
   const completionRate = totals.starts ? Math.round((totals.completions / totals.starts) * 100) : 0;
   const conversionRate = totals.views ? Math.round((totals.completions / totals.views) * 100) : 0;
+
+  const dropoffChartData = useMemo(() => {
+    if (!dropoff) return [];
+    return steps.map((node, i) => {
+      const reached = dropoff.reachedByStep[i] ?? 0;
+      const nextReached = i + 1 < steps.length ? dropoff.reachedByStep[i + 1] ?? 0 : dropoff.completedSessions;
+      const dropped = Math.max(0, reached - nextReached);
+      const dropRate = reached ? Math.round((dropped / reached) * 100) : 0;
+      return { label: `${i + 1}. ${stepLabel(node)}`, reached, dropped, dropRate };
+    });
+  }, [dropoff, steps]);
 
   return (
     <div className="p-6 space-y-6 max-w-5xl">
@@ -122,6 +168,49 @@ export function AnalyticsTab({ quizId }: { quizId: string }) {
                 <Bar dataKey="completions" fill="var(--color-chart-1)" radius={4} name="השלמות" />
               </BarChart>
             </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">נטישה לפי שאלה</CardTitle></CardHeader>
+        <CardContent>
+          {steps.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">אין שאלות בשאלון הזה עדיין.</p>
+          ) : !dropoff || dropoff.totalSessions === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              עדיין אין מספיק נתוני מבקרים כדי להציג נטישה לפי שאלה.
+            </p>
+          ) : (
+            <div dir="ltr">
+              <ResponsiveContainer width="100%" height={Math.max(220, steps.length * 46)}>
+                <BarChart data={dropoffChartData} layout="vertical" margin={{ left: 10, right: 30 }}>
+                  <CartesianGrid horizontal={false} stroke="var(--color-border)" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <YAxis
+                    type="category"
+                    dataKey="label"
+                    width={220}
+                    tick={{ fontSize: 12 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{ direction: "rtl", fontSize: 12, borderRadius: 8 }}
+                    formatter={(value, name, entry) => {
+                      if (name === "reached") return [value ?? 0, "הגיעו לשאלה"];
+                      const rate = (entry?.payload as { dropRate: number } | undefined)?.dropRate ?? 0;
+                      return [`${value ?? 0} (${rate}%)`, "נטשו כאן"];
+                    }}
+                  />
+                  <Bar dataKey="reached" fill="var(--color-chart-2)" radius={4} name="reached" />
+                  <Bar dataKey="dropped" fill="var(--color-destructive)" radius={4} name="dropped" />
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="mt-3 text-xs text-muted-foreground">
+                מבוסס על {dropoff.totalSessions} מבקרים שהתחילו את השאלון (לא כולל סשנים לדוגמה). &quot;נטשו כאן&quot; = מי שהגיע לשאלה אך לא המשיך לשאלה הבאה (או לא סיים, אם זו השאלה האחרונה).
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>
