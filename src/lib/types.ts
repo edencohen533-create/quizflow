@@ -181,6 +181,8 @@ export interface QuizTheme {
   overlay: "none" | "light" | "dark";
   fontFamily: "assistant" | "heebo";
   buttonStyle: "rounded" | "square" | "pill";
+  // corner radius (px) for message/answer bubbles and cards; falls back to 22
+  cornerRadius?: number;
   cardPosition: "center" | "right" | "left";
   showProgressBar: boolean;
   showQuestionNumber: boolean;
