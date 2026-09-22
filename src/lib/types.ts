@@ -178,7 +178,9 @@ export interface QuizTheme {
   backgroundImageUrl?: string;
   backgroundImageUrlMobile?: string;
   overlay: "none" | "light" | "dark";
-  fontFamily: "assistant" | "heebo";
+  fontFamily: "assistant" | "heebo" | "nunito";
+  // base body text size (px) in the live runner; falls back to 16
+  fontSize?: number;
   buttonStyle: "rounded" | "square" | "pill";
   // corner radius (px) for message/answer bubbles and cards; falls back to 22
   cornerRadius?: number;
