@@ -25,7 +25,7 @@ Compatibility changes: webhook destinations must use public HTTPS on port 443 an
 
 ## Verification
 
-- Automated Node tests execute real TypeScript helpers/routes with database/network mocks. Coverage includes tampered/expired capabilities, cross-tenant denial, anonymous API rejection, DNS pinning/private ranges, dangerous URLs, CSV injection, score tampering, replay suppression, persistence failures and overlapping saves.
+- 92 automated tests passed (81 security/reliability and 11 performance). Automated Node tests execute real TypeScript helpers/routes with database/network mocks. Coverage includes tampered/expired capabilities, cross-tenant denial, anonymous API rejection, DNS pinning/private ranges, dangerous URLs, CSV injection, score tampering, replay suppression, persistence failures and overlapping saves.
 - Existing performance regressions remain enabled.
 - Targeted ESLint, TypeScript and optimized Next.js build run remotely in Vercel.
 - Production dependency audit (`npm audit --omit=dev --audit-level=high`) reported zero known vulnerabilities on 2026-09-22. This is not a code-security guarantee.
@@ -33,7 +33,7 @@ Compatibility changes: webhook destinations must use public HTTPS on port 443 an
 - Chromium: desktop 991x640 and mobile 390x844, no horizontal overflow, logo/avatar rendering retained, double-click protection and back navigation passed; unauthenticated dashboard redirected to login; no runtime page errors.
 - Real browser sandbox probe confirmed a null/opaque origin and denied parent DOM and localStorage access.
 - Browser write requests were intercepted. No production leads were created and no marketing/webhook events were sent by those tests.
-- The exercised public quiz path did not reach contact capture, so browser verification of successful lead persistence is not claimed. Server success/failure behavior and client error propagation are covered with mocked transport.
+- The complete contact-capture path was exercised with intercepted writes: ten answers and the latest name/phone were included, an injected 503 produced a visible error, automatic redirection stayed paused, and retry succeeded. This verifies browser behavior; actual persisted database rows and external delivery were not exercised.
 
 ## Open items — do not mark the security work fully complete
 
