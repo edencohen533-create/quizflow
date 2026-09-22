@@ -413,11 +413,11 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
             const imageCard = blockImageUrl && (
               <div
                 key="image"
-                className={`w-full bg-white p-4 shadow-sm ${imageBelow ? "mt-3" : "mb-3"}`}
+                className={`w-full bg-white p-6 shadow-sm sm:p-8 ${imageBelow ? "mt-3" : "mb-3"}`}
                 style={{ borderRadius: PALETTE.radius }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={blockImageUrl} alt="" className="max-h-56 w-full object-contain" />
+                <img src={blockImageUrl} alt="" className="mx-auto max-h-40 w-full max-w-[62%] object-contain sm:max-h-48" />
               </div>
             );
             const bubbleRow = (
@@ -428,18 +428,18 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
                   style={{ background: PALETTE.bubbleBot, color: PALETTE.text, borderRadius: PALETTE.radius }}
                 >
                   <BotNodeContent node={node} params={paramValues} />
-                  {isActive && (
-                    <div className="mt-4">
-                      <NodeControls
-                        node={node}
-                        palette={PALETTE}
-                        leadInfo={leadInfo}
-                        onLeadInfoChange={(patch) => setLeadInfo((s) => ({ ...s, ...patch }))}
-                        onComplete={(text, handle, answer) => handleComplete(node, text, handle, answer)}
-                      />
-                    </div>
-                  )}
                 </div>
+              </div>
+            );
+            const controlsRow = isActive && (
+              <div key="controls" className="mt-3 w-full">
+                <NodeControls
+                  node={node}
+                  palette={PALETTE}
+                  leadInfo={leadInfo}
+                  onLeadInfoChange={(patch) => setLeadInfo((s) => ({ ...s, ...patch }))}
+                  onComplete={(text, handle, answer) => handleComplete(node, text, handle, answer)}
+                />
               </div>
             );
 
@@ -448,6 +448,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
                 <div ref={isActive ? activeNodeRef : undefined} className="flex max-w-[85%] flex-col items-end gap-1">
                   {imageBelow ? [bubbleRow, imageCard] : [imageCard, bubbleRow]}
                   <span className="px-1 text-xs" style={{ color: PALETTE.muted }}>{timeLabel(entry.ts)}</span>
+                  {controlsRow}
                   {isActive && history.length > 1 && (
                     <button
                       onClick={goBack}
@@ -579,7 +580,7 @@ function NodeControls({
     if (data.answerType === "single_choice") {
       return (
         <div className="space-y-2">
-          <p className="text-xs" style={{ color: PALETTE.muted }}>בחר/י תשובה</p>
+          {data.options.length > 1 && <p className="text-xs" style={{ color: PALETTE.muted }}>בחר/י תשובה</p>}
           <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap">
             {data.options.map((opt) => (
               <button
