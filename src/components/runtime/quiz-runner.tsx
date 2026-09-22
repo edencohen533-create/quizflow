@@ -148,6 +148,14 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   useEffect(() => {
     leadInfoRef.current = leadInfo;
   }, [leadInfo]);
+  const activeNodeIdRef = useRef(activeNodeId);
+  useEffect(() => {
+    activeNodeIdRef.current = activeNodeId;
+  }, [activeNodeId]);
+  const answersRef = useRef(answers);
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
 
   // Live session tracking for the "מרכז שיחות" live view — reuses the same
   // sessionIdRef as the Pixel/CAPI dedup above. Fire-and-forget, non-blocking.
@@ -218,6 +226,29 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
     if (firstNode && firstNode.type !== "end") {
       pushSessionUpdate(firstNode, 0, "active", {}, 0);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Heartbeat for the "מרכז שיחות" live view: re-sends the current step
+  // every 10s while the tab is visible, so a session goes stale quickly
+  // (see LIVE_WINDOW_MS) once the visitor closes the tab, switches away,
+  // or otherwise stops actually looking at the quiz — instead of only
+  // updating on step transitions, which leaves a long silent gap while
+  // someone is just thinking or has already left.
+  useEffect(() => {
+    const HEARTBEAT_MS = 10_000;
+    const interval = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      if (submittedRef.current) return;
+      const nodeId = activeNodeIdRef.current;
+      if (!nodeId) return;
+      const node = quiz.nodes.find((n) => n.id === nodeId);
+      if (!node) return;
+      const mergedAnswers = answersRef.current;
+      const mergedScore = Object.values(mergedAnswers).reduce((sum, a) => sum + a.score, 0);
+      pushSessionUpdate(node, Object.keys(mergedAnswers).length, "active", mergedAnswers, mergedScore);
+    }, HEARTBEAT_MS);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -1,6 +1,9 @@
 import { QuizSession, QuizSessionDisplayStatus } from "@/lib/types";
 
-export const LIVE_WINDOW_MS = 90_000;
+// The runner sends a heartbeat every 10s while its tab is visible (see
+// quiz-runner.tsx), so a real visitor should never go quiet for long —
+// this just needs to tolerate one or two missed beats before flipping.
+export const LIVE_WINDOW_MS = 25_000;
 
 export function displaySessionStatus(session: QuizSession, nowMs: number): QuizSessionDisplayStatus {
   if (session.status === "completed") return "completed";
