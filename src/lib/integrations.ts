@@ -91,11 +91,11 @@ function fireTikTokPixel(pixelId: string) {
 // Webhooks and secrets never touch the browser — a server route holding the
 // service-role key looks up the workspace's integrations and dispatches them,
 // returning only which pixels to fire client-side.
-export async function triggerIntegrations(leadId: string) {
+export async function triggerIntegrations(leadId: string, token: string) {
   try {
     const res = await fetch("/api/dispatch-integrations", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
       body: JSON.stringify({ leadId }),
     });
     const data = await res.json().catch(() => ({ ok: false, pixels: [] }));
@@ -114,16 +114,7 @@ export async function testWebhook(supabase: SupabaseClient, integration: Integra
     const res = await fetch("/api/relay-webhook", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        url: integration.url,
-        secret: integration.secret,
-        payload: {
-          test: true,
-          message: "בדיקת חיבור מ-QuizFlow",
-          sentAt: new Date().toISOString(),
-          params: Object.fromEntries((integration.extraParams ?? []).map((p) => [p.key, p.value])),
-        },
-      }),
+      body: JSON.stringify({ integrationId: integration.id }),
     });
     const data = await res.json().catch(() => ({ ok: false }));
     await recordIntegrationResult(supabase, integration.id, {

@@ -16,6 +16,8 @@ import { fireTrackingEvent } from "@/lib/tracking-runtime";
 import { QuizTrackingEvent, QuizTrackingSettings, QuizSessionAnswer } from "@/lib/types";
 import { SunAvatar } from "@/components/runtime/sun-avatar";
 import { renderRichText } from "@/lib/rich-text";
+import type { PublicSession } from "@/lib/public-session";
+import { safeLink } from "@/lib/safe-content";
 import { FONT_FAMILY_CSS } from "@/lib/quiz-fonts";
 
 const Checkbox = dynamic(() => import("@/components/ui/checkbox").then((m) => m.Checkbox));
@@ -107,13 +109,17 @@ interface LeadInfoState {
   consent: boolean;
 }
 
-export function QuizRunner({ quiz }: { quiz: Quiz }) {
+export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSession }) {
   const supabase = useMemo(() => createClient(), []);
   const nodesById = useMemo(() => new Map(quiz.nodes.map((node) => [node.id, node])), [quiz.nodes]);
   const searchParams = useSearchParams();
   const utmSource = searchParams.get("utm_source") ?? undefined;
   const startedRef = useRef(false);
   const submittedRef = useRef(false);
+  const advancingRef = useRef(false);
+  const [submissionState, setSubmissionState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const retryRef = useRef<(() => void) | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const activeNodeRef = useRef<HTMLDivElement>(null);
 
@@ -149,7 +155,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
 
   // Meta Pixel/CAPI + GTM tracking (separate from the quiz's own analytics/
   // integrations calls above — additive, doesn't affect existing behavior).
-  const sessionIdRef = useRef<string>(crypto.randomUUID());
+  const sessionIdRef = useRef<string>(session?.sessionId ?? crypto.randomUUID());
   const trackingRef = useRef<{ settings: QuizTrackingSettings; events: QuizTrackingEvent[] } | null>(null);
   const firedPageLoadRef = useRef(false);
   const leadInfoRef = useRef(leadInfo);
@@ -169,16 +175,13 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   // sessionIdRef as the Pixel/CAPI dedup above. Fire-and-forget, non-blocking.
   const totalStepsRef = useRef(totalStepsFor(quiz));
   function pushSessionUpdate(node: QuizNode, stepIndex: number, status: "active" | "completed", mergedAnswers: Record<string, LeadAnswer>, mergedScore: number) {
+    if (!session) return;
     const lead = leadInfoRef.current;
     const category = mergedScore >= 26 ? "hot" : mergedScore >= 16 ? "warm" : "cold";
-    const answersPayload: QuizSessionAnswer[] = Object.values(mergedAnswers).map((a) => ({
-      nodeId: a.nodeId,
-      questionTitle: a.questionTitle,
-      answerLabel: a.answerLabel,
-    }));
+    const answersPayload: QuizSessionAnswer[] = Object.values(mergedAnswers);
     fetch("/api/quiz-sessions/track", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.token },
       body: JSON.stringify({
         sessionId: sessionIdRef.current,
         quizId: quiz.id,
@@ -209,6 +212,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
       if (ev.triggerNodeId !== triggerKey) continue;
       fireTrackingEvent(ev, {
         sessionId: sessionIdRef.current,
+        sessionToken: session?.token,
         quizId: quiz.id,
         settings: tracking.settings,
         phone: leadInfoRef.current.phone || undefined,
@@ -219,7 +223,8 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   }
 
   useEffect(() => {
-    recordAnalyticsEvent(supabase, quiz.id, "view", utmSource);
+    if (!session) return;
+    recordAnalyticsEvent(supabase, quiz.id, "view", utmSource, session);
     (async () => {
       const [settings, events] = await Promise.all([
         getTrackingSettings(supabase, quiz.id),
@@ -230,7 +235,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
         firedPageLoadRef.current = true;
         fireEventsForTrigger(null);
       }
-    })();
+    })().catch(() => {});
     if (firstNode && firstNode.type !== "end") {
       pushSessionUpdate(firstNode, 0, "active", {}, 0);
     }
@@ -277,16 +282,22 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   }
 
   async function submitLead(finalAnswers: Record<string, LeadAnswer>, finalScore: number) {
-    if (submittedRef.current) return;
+    if (submittedRef.current || !session) return;
     submittedRef.current = true;
+    setSubmissionError(null);
+    setSubmissionState("saving");
+    retryRef.current = () => { void submitLead(finalAnswers, finalScore); };
+    try {
+    const lead = leadInfoRef.current;
     const category = finalScore >= 26 ? "hot" : finalScore >= 16 ? "warm" : "cold";
     const leadId = await submitPublicQuizResponse(
       supabase,
       quiz,
       {
-        name: leadInfo.name || "ללא שם",
-        phone: leadInfo.phone,
-        email: leadInfo.email,
+        name: lead.name || "ללא שם",
+        phone: lead.phone,
+        email: lead.email,
+        consent: lead.consent,
         score: finalScore,
         category,
         utmSource,
@@ -294,20 +305,27 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
         utmCampaign: searchParams.get("utm_campaign") ?? undefined,
         utmContent: searchParams.get("utm_content") ?? undefined,
       },
-      Object.values(finalAnswers)
+      Object.values(finalAnswers),
+      session
     );
-    recordAnalyticsEvent(supabase, quiz.id, "complete", utmSource);
-    triggerIntegrations(leadId);
+    recordAnalyticsEvent(supabase, quiz.id, "complete", utmSource, session);
+    triggerIntegrations(leadId, session.token);
+    setSubmissionState("saved");
+    } catch {
+      submittedRef.current = false;
+      setSubmissionState("failed");
+      setSubmissionError("לא הצלחנו לשמור את הפרטים. לחצו כדי לנסות שוב.");
+    }
   }
 
   function advanceTo(fromId: string, handle: string | null, answerForScore?: LeadAnswer) {
     if (!startedRef.current) {
       startedRef.current = true;
-      recordAnalyticsEvent(supabase, quiz.id, "start", utmSource);
+      if (session) recordAnalyticsEvent(supabase, quiz.id, "start", utmSource, session);
     }
     const next = resolveRenderable(quiz, fromId, handle);
     setActiveNodeId(null);
-    if (!next) return;
+    if (!next) { advancingRef.current = false; setActiveNodeId(fromId); return; }
 
     const mergedAnswers = answerForScore ? { ...answers, [answerForScore.nodeId]: answerForScore } : answers;
     const mergedScore = Object.values(mergedAnswers).reduce((sum, a) => sum + a.score, 0);
@@ -315,6 +333,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
     const typingId = uid();
     setEntries((es) => [...es, { id: typingId, kind: "typing", ts: Date.now() }]);
     setTimeout(() => {
+      advancingRef.current = false;
       setEntries((es) => {
         const withoutTyping = es.filter((e) => e.id !== typingId);
         if (next.type === "end") {
@@ -323,7 +342,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
         return [...withoutTyping, { id: uid(), kind: "bot", nodeId: next.id, ts: Date.now() }];
       });
       if (next.type === "end") {
-        if (leadInfo.phone || leadInfo.email || leadInfo.name) submitLead(mergedAnswers, mergedScore);
+        if (leadInfoRef.current.phone || leadInfoRef.current.email || leadInfoRef.current.name) void submitLead(mergedAnswers, mergedScore);
       } else {
         setActiveNodeId(next.id);
         setHistory((h) => [...h, next.id]);
@@ -335,6 +354,8 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   }
 
   function handleComplete(node: QuizNode, userText: string, handle: string | null, answer?: LeadAnswer) {
+    if (advancingRef.current || activeNodeIdRef.current !== node.id) return;
+    advancingRef.current = true;
     if (answer) setAnswers((a) => ({ ...a, [node.id]: answer }));
     setEntries((es) => [...es, { id: uid(), kind: "user", text: userText, ts: Date.now() }]);
     if (node.data.kind === "lead_details") fireEventsForTrigger("__lead_details__");
@@ -344,7 +365,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   // Undoes the last step: drops the answer bubble and the current
   // question, and re-activates whichever question came before it.
   function goBack() {
-    if (history.length < 2) return;
+    if (!quiz.allowBack || advancingRef.current || history.length < 2) return;
     const prevId = history[history.length - 2];
     setHistory((h) => h.slice(0, -1));
     setAnswers((a) => {
@@ -372,6 +393,8 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
     <div dir="rtl" className="qf-runner-bg min-h-screen" style={{ fontFamily: PALETTE.fontFamily, fontSize: PALETTE.fontSize, fontWeight: 500 }}>
       <style>{`.qf-runner-bg{background:${desktopBg};}@media (max-width:767px){.qf-runner-bg{background:${mobileBg};}}`}</style>
       <div className="mx-auto max-w-[680px] px-4 pb-24 pt-6 sm:px-6 sm:pt-10">
+        {submissionState === "saving" && <p role="status" className="mb-4 text-center">שומרים את הפרטים...</p>}
+        {submissionError && <div role="alert" className="mb-4 rounded-lg bg-white p-4 text-red-700">{submissionError}<button className="mx-2 underline" onClick={() => retryRef.current?.()}>נסו שוב</button></div>}
         <div className="space-y-5">
           {entries.map((entry) => {
             if (entry.kind === "user") {
@@ -405,7 +428,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
             if (entry.kind === "result") {
               const node = nodesById.get(entry.nodeId);
               if (!node || node.data.kind !== "end") return null;
-              return <ResultCard key={entry.id} data={node.data} palette={PALETTE} avatarUrl={quiz.theme.avatarUrl} params={paramValues} />;
+              return <ResultCard key={entry.id} canRedirect={submissionState === "idle" || submissionState === "saved"} data={node.data} palette={PALETTE} avatarUrl={quiz.theme.avatarUrl} params={paramValues} />;
             }
 
             const node = nodesById.get(entry.nodeId);
@@ -446,7 +469,10 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
                   node={node}
                   palette={PALETTE}
                   leadInfo={leadInfo}
-                  onLeadInfoChange={(patch) => setLeadInfo((s) => ({ ...s, ...patch }))}
+                  onLeadInfoChange={(patch) => {
+                    leadInfoRef.current = { ...leadInfoRef.current, ...patch };
+                    setLeadInfo(leadInfoRef.current);
+                  }}
                   onComplete={(text, handle, answer) => handleComplete(node, text, handle, answer)}
                 />
               </div>
@@ -457,7 +483,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
                 <div ref={isActive ? activeNodeRef : undefined} className="flex w-full min-w-0 flex-col items-end">
                   {imageBelow ? [bubbleRow, imageCard] : [imageCard, bubbleRow]}
                   {controlsRow}
-                  {isActive && history.length > 1 && (
+                  {isActive && quiz.allowBack && history.length > 1 && (
                     <button
                       onClick={goBack}
                       className="mt-3 flex w-fit items-center gap-1.5 self-start rounded-full bg-black/5 px-4 py-2 text-xs font-medium"
@@ -606,7 +632,7 @@ function NodeControls({
               <button
                 key={opt.id}
                 onClick={() =>
-                  onComplete(opt.label, data.combineAnswers ? null : opt.id, { nodeId: node.id, questionTitle: data.title, answerLabel: opt.label, score: opt.score, paramKey: data.paramKey })
+                  onComplete(opt.label, data.combineAnswers ? null : opt.id, { nodeId: node.id, questionTitle: data.title, answerLabel: opt.label, optionIds: [opt.id], score: opt.score, paramKey: data.paramKey })
                 }
                 className="min-h-[50px] rounded-[4px] border-2 bg-white px-4 py-3 text-[length:inherit] font-medium transition-transform active:scale-[0.97] sm:min-w-[140px] sm:basis-[31%] sm:grow-0"
                 style={{ borderColor: PALETTE.buttonBorder, color: PALETTE.buttonText }}
@@ -647,7 +673,7 @@ function NodeControls({
             onClick={() => {
               const labels = data.options.filter((o) => multi.includes(o.id)).map((o) => o.label).join(", ");
               const totalScore = data.options.filter((o) => multi.includes(o.id)).reduce((s, o) => s + o.score, 0);
-              onComplete(labels || "—", data.combineAnswers ? null : multi[0] ?? null, { nodeId: node.id, questionTitle: data.title, answerLabel: labels || "—", score: totalScore, paramKey: data.paramKey });
+              onComplete(labels || "—", data.combineAnswers ? null : multi[0] ?? null, { nodeId: node.id, questionTitle: data.title, answerLabel: labels || "—", optionIds: multi, score: totalScore, paramKey: data.paramKey });
             }}
           >
             המשך
@@ -733,6 +759,10 @@ function NodeControls({
     const data = node.data;
 
     function handleSubmit() {
+      if (data.showEmail && leadInfo.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadInfo.email)) {
+        setError("כתובת אימייל לא תקינה");
+        return;
+      }
       if (data.showPhone && data.requirePhoneIL && !isValidIsraeliPhone(leadInfo.phone)) {
         setError("מספר טלפון לא תקין");
         return;
@@ -750,6 +780,7 @@ function NodeControls({
         {data.showName && (
           <input
             placeholder="שם מלא"
+            maxLength={200}
             value={leadInfo.name}
             onChange={(e) => onLeadInfoChange({ name: e.target.value })}
             className="w-full rounded-lg border px-4 py-2.5 text-sm outline-none focus:ring-2"
@@ -759,6 +790,8 @@ function NodeControls({
         {data.showPhone && (
           <input
             placeholder="טלפון"
+            type="tel"
+            maxLength={40}
             dir="ltr"
             value={leadInfo.phone}
             onChange={(e) => onLeadInfoChange({ phone: e.target.value })}
@@ -769,6 +802,8 @@ function NodeControls({
         {data.showEmail && (
           <input
             placeholder="אימייל"
+            type="email"
+            maxLength={254}
             dir="ltr"
             value={leadInfo.email}
             onChange={(e) => onLeadInfoChange({ email: e.target.value })}
@@ -794,29 +829,33 @@ function NodeControls({
 }
 
 function ResultCard({
+  canRedirect,
   data,
   palette,
   avatarUrl,
   params,
 }: {
+  canRedirect: boolean;
   data: Extract<QuizNode["data"], { kind: "end" }>;
   palette: Palette;
   avatarUrl?: string;
   params: Record<string, string>;
 }) {
   const PALETTE = palette;
-  const shouldRedirect = !!(data.redirectEnabled && data.redirectUrl);
-  const [secondsLeft, setSecondsLeft] = useState(data.redirectDelaySeconds ?? 3);
+  const redirectUrl = safeLink(data.redirectUrl);
+  const ctaUrl = safeLink(data.ctaUrl);
+  const shouldRedirect = !!(canRedirect && data.redirectEnabled && redirectUrl);
+  const [secondsLeft, setSecondsLeft] = useState(Math.min(300, Math.max(0, data.redirectDelaySeconds ?? 3)));
 
   useEffect(() => {
     if (!shouldRedirect) return;
     if (secondsLeft <= 0) {
-      window.location.href = data.redirectUrl!;
+      window.location.href = redirectUrl!;
       return;
     }
     const timer = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
     return () => clearTimeout(timer);
-  }, [shouldRedirect, secondsLeft, data.redirectUrl]);
+  }, [shouldRedirect, secondsLeft, redirectUrl]);
 
   return (
     <div className="flex justify-start">
@@ -832,9 +871,9 @@ function ResultCard({
         {shouldRedirect && (
           <p className="mt-3 text-xs" style={{ color: PALETTE.muted }}>מעביר אותך אוטומטית תוך {secondsLeft} שניות...</p>
         )}
-        {data.ctaLabel && data.ctaUrl && (
+        {data.ctaLabel && ctaUrl && (
           <a
-            href={data.ctaUrl}
+            href={ctaUrl}
             target="_blank"
             rel="noreferrer"
             className="mt-4 block rounded-lg border-2 bg-white py-3 text-sm font-semibold"

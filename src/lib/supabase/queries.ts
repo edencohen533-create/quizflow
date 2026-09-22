@@ -206,18 +206,48 @@ export async function deleteQuiz(supabase: SupabaseClient, quizId: string) {
   if (error) throw error;
 }
 
-export async function saveFlow(supabase: SupabaseClient, quizId: string, nodes: QuizNode[], edges: QuizEdge[]) {
-  await supabase.from("quiz_nodes").delete().eq("quiz_id", quizId);
-  await supabase.from("quiz_edges").delete().eq("quiz_id", quizId);
-  if (nodes.length) {
-    const { error } = await supabase.from("quiz_nodes").insert(nodes.map((n) => nodeToRow(quizId, n)));
+const flowSaves = new Map<string, Promise<void>>();
+export function saveFlow(supabase: SupabaseClient, quizId: string, nodes: QuizNode[], edges: QuizEdge[]): Promise<void> {
+  // Serialize saves from this editor so an older response cannot replace a newer
+  // graph. A cross-client transaction/version check is a database follow-up.
+  const snapshot = structuredClone({ nodes, edges });
+  const next = (flowSaves.get(quizId) ?? Promise.resolve()).catch(() => {}).then(async () => {
+    const nodeIds = new Set(snapshot.nodes.map((n) => n.id));
+    if (nodeIds.size !== snapshot.nodes.length || new Set(snapshot.edges.map((edge) => edge.id)).size !== snapshot.edges.length ||
+        snapshot.edges.some((edge) => !nodeIds.has(edge.source) || !nodeIds.has(edge.target))) throw new Error("התרשים מכיל חיבורים לא תקינים");
+    const [oldNodes, oldEdges] = await Promise.all([
+      supabase.from("quiz_nodes").select("id").eq("quiz_id", quizId),
+      supabase.from("quiz_edges").select("id").eq("quiz_id", quizId),
+    ]);
+    if (oldNodes.error) throw oldNodes.error;
+    if (oldEdges.error) throw oldEdges.error;
+    // Persist replacements BEFORE deleting obsolete rows; a failed insert must
+    // never leave a previously working quiz with every node deleted.
+    if (snapshot.nodes.length) {
+      const { error } = await supabase.from("quiz_nodes").upsert(snapshot.nodes.map((n) => nodeToRow(quizId, n)), { onConflict: "quiz_id,id" });
+      if (error) throw error;
+    }
+    if (snapshot.edges.length) {
+      const { error } = await supabase.from("quiz_edges").upsert(snapshot.edges.map((edge) => edgeToRow(quizId, edge)), { onConflict: "quiz_id,id" });
+      if (error) throw error;
+    }
+    const edgeIds = new Set(snapshot.edges.map((edge) => edge.id));
+    for (const [table, ids] of [
+      ["quiz_edges", (oldEdges.data ?? []).filter((row) => !edgeIds.has(row.id)).map((row) => row.id)],
+      ["quiz_nodes", (oldNodes.data ?? []).filter((row) => !nodeIds.has(row.id)).map((row) => row.id)],
+    ] as const) {
+      if (ids.length) {
+        const { error } = await supabase.from(table).delete().eq("quiz_id", quizId).in("id", ids);
+        if (error) throw error;
+      }
+    }
+    const { error } = await supabase.from("quizzes").update({ updated_at: new Date().toISOString() }).eq("id", quizId);
     if (error) throw error;
-  }
-  if (edges.length) {
-    const { error } = await supabase.from("quiz_edges").insert(edges.map((e) => edgeToRow(quizId, e)));
-    if (error) throw error;
-  }
-  await supabase.from("quizzes").update({ updated_at: new Date().toISOString() }).eq("id", quizId);
+  });
+  flowSaves.set(quizId, next);
+  const cleanup = () => { if (flowSaves.get(quizId) === next) flowSaves.delete(quizId); };
+  void next.then(cleanup, cleanup);
+  return next;
 }
 
 // ---------------- Leads ----------------
@@ -384,64 +414,19 @@ export async function deleteLead(supabase: SupabaseClient, leadId: string) {
 // Public (anonymous-safe) submission path: ids are generated client-side so we
 // never need a SELECT back on rows that anon isn't allowed to read.
 export async function submitPublicQuizResponse(
-  supabase: SupabaseClient,
-  quiz: Quiz,
-  lead: {
-    name: string;
-    phone: string;
-    email: string;
-    score: number;
-    category: "hot" | "warm" | "cold";
-    utmSource?: string;
-    utmMedium?: string;
-    utmCampaign?: string;
-    utmContent?: string;
-  },
-  answers: LeadAnswer[]
+  _supabase: SupabaseClient,
+  _quiz: Quiz,
+  lead: { name: string; phone: string; email: string; consent?: boolean; score: number; category: "hot" | "warm" | "cold"; utmSource?: string; utmMedium?: string; utmCampaign?: string; utmContent?: string },
+  answers: LeadAnswer[],
+  session: import("@/lib/public-session").PublicSession
 ) {
-  const leadId = crypto.randomUUID();
-  const submissionId = crypto.randomUUID();
-
-  const { error: leadError } = await supabase.from("leads").insert({
-    id: leadId,
-    workspace_id: quiz.workspaceId,
-    quiz_id: quiz.id,
-    name: lead.name,
-    phone: lead.phone,
-    email: lead.email,
-    score: lead.score,
-    category: lead.category,
-    status: "new",
-    utm_source: lead.utmSource ?? null,
-    utm_medium: lead.utmMedium ?? null,
-    utm_campaign: lead.utmCampaign ?? null,
-    utm_content: lead.utmContent ?? null,
+  const response = await fetch("/api/quiz-submissions", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.token },
+    body: JSON.stringify({ lead, answers }),
   });
-  if (leadError) throw leadError;
-
-  await supabase.from("quiz_submissions").insert({
-    id: submissionId,
-    quiz_id: quiz.id,
-    lead_id: leadId,
-    score: lead.score,
-    category: lead.category,
-    utm_source: lead.utmSource ?? null,
-    utm_medium: lead.utmMedium ?? null,
-    utm_campaign: lead.utmCampaign ?? null,
-  });
-
-  if (answers.length) {
-    // submission_answers' RLS check needs to read quiz_submissions, which anon
-    // has no SELECT policy on (nested-RLS gap) — route this write through a
-    // server route holding the service-role key instead of inserting directly.
-    await fetch("/api/save-answers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ submissionId, answers }),
-    }).catch(() => {});
-  }
-
-  return leadId;
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error("שמירת הפרטים נכשלה. נסו שוב.");
+  return result.leadId as string;
 }
 
 export async function listAnalyticsEvents(supabase: SupabaseClient, quizId: string, sinceIso: string) {
@@ -481,12 +466,15 @@ export async function getQuestionDropoff(supabase: SupabaseClient, quizId: strin
 }
 
 export async function recordAnalyticsEvent(
-  supabase: SupabaseClient,
-  quizId: string,
-  eventType: "view" | "start" | "complete",
-  utmSource?: string
+  _supabase: SupabaseClient, _quizId: string, eventType: "view" | "start" | "complete",
+  utmSource?: string, session?: import("@/lib/public-session").PublicSession
 ) {
-  await supabase.from("analytics_events").insert({ quiz_id: quizId, event_type: eventType, utm_source: utmSource ?? null });
+  if (!session) return;
+  // Analytics must never interrupt quiz completion.
+  await fetch("/api/analytics", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.token },
+    body: JSON.stringify({ eventType, utmSource }),
+  }).catch(() => {});
 }
 
 // ---------------- Integrations ----------------

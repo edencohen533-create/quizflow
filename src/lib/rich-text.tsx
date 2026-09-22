@@ -1,3 +1,4 @@
+import { safeLink } from "@/lib/safe-content";
 import { ReactNode } from "react";
 
 // Authors commonly type a question as "...word ?" (space before the mark).
@@ -29,7 +30,7 @@ export function renderRichText(rawText: string): ReactNode {
     if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
     if (match[1] !== undefined) {
       nodes.push(
-        <a key={key++} href={match[2]} target="_blank" rel="noreferrer" className="underline">
+        <a key={key++} href={safeLink(match[2])} target="_blank" rel="noopener noreferrer" className="underline">
           {match[1]}
         </a>
       );

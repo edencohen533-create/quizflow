@@ -1,24 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { NextResponse } from "next/server";
+import { requirePublicQuiz } from "@/lib/security/public-quiz";
+import { securePost, HttpError } from "@/lib/security/http";
+import { sendWebhook } from "@/lib/security/webhook";
+import { operationId } from "@/lib/security/ids";
 
-export async function POST(req: NextRequest) {
-  let body: { leadId?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "invalid JSON body" }, { status: 400 });
-  }
-  const { leadId } = body;
-  if (!leadId) {
-    return NextResponse.json({ ok: false, error: "missing leadId" }, { status: 400 });
-  }
-
-  const admin = createAdminClient();
-
+export const POST = securePost(async (req, body) => {
+  const { session, admin, quiz } = await requirePublicQuiz(req);
+  if (body.leadId !== session.leadId) throw new HttpError(403, "Not authorized");
+  const leadId = session.leadId;
   const { data: lead, error: leadError } = await admin
     .from("leads")
     .select("id, workspace_id, quiz_id, name, phone, email, score, category, utm_source, utm_medium, utm_campaign, created_at, quizzes(name)")
     .eq("id", leadId)
+    .eq("workspace_id", quiz.workspaceId)
+    .eq("quiz_id", quiz.id)
     .maybeSingle();
 
   if (leadError || !lead) {
@@ -29,7 +24,11 @@ export async function POST(req: NextRequest) {
     .from("quiz_submissions")
     .select("id")
     .eq("lead_id", lead.id)
+    .eq("id", session.submissionId)
+    .eq("quiz_id", quiz.id)
     .maybeSingle();
+
+  if (!submission) throw new HttpError(409, "Submission not ready");
 
   const { data: answerRows } = submission
     ? await admin.from("submission_answers").select("node_id, question_title, answer_label, param_key").eq("submission_id", submission.id)
@@ -43,8 +42,16 @@ export async function POST(req: NextRequest) {
   const { data: integrations } = await admin
     .from("integrations")
     .select("*")
-    .eq("quiz_id", lead.quiz_id)
+    .eq("quiz_id", quiz.id)
+    .eq("workspace_id", quiz.workspaceId)
     .eq("enabled", true);
+
+  const { error: claimError } = await admin.from("quiz_tracking_activity").insert({
+    id: operationId("dispatch", session.leadId), quiz_id: quiz.id,
+    message: "התחילה שליחת אינטגרציות לליד",
+  });
+  if (claimError?.code === "23505") return NextResponse.json({ ok: true, pixels: [], duplicate: true });
+  if (claimError) throw new HttpError(503, "Could not claim delivery");
 
   const pixels: { kind: "meta_pixel" | "tiktok_pixel"; pixelId: string }[] = [];
 
@@ -52,13 +59,7 @@ export async function POST(req: NextRequest) {
     if (integration.kind === "webhook" && integration.url) {
       const extraParams: { key: string; value: string }[] = integration.extra_params ?? [];
       try {
-        const res = await fetch(integration.url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(integration.secret ? { "X-QuizFlow-Secret": integration.secret } : {}),
-          },
-          body: JSON.stringify({
+        const res = await sendWebhook(integration.url, {
             leadId: lead.id,
             quizId: lead.quiz_id,
             quizName: (lead.quizzes as unknown as { name: string } | null)?.name,
@@ -73,19 +74,18 @@ export async function POST(req: NextRequest) {
             createdAt: lead.created_at,
             data: answerData,
             params: Object.fromEntries(extraParams.map((p) => [p.key, p.value])),
-          }),
-        });
+          }, integration.secret);
         await admin
           .from("integrations")
           .update({ last_triggered_at: new Date().toISOString(), last_status: res.ok ? "success" : "error", last_error: res.ok ? null : `HTTP ${res.status}` })
           .eq("id", integration.id);
-      } catch (err) {
+      } catch {
         await admin
           .from("integrations")
           .update({
             last_triggered_at: new Date().toISOString(),
             last_status: "error",
-            last_error: err instanceof Error ? err.message : "שליחה נכשלה",
+            last_error: "שליחת Webhook נכשלה",
           })
           .eq("id", integration.id);
       }
@@ -95,4 +95,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, pixels });
-}
+});
