@@ -26,7 +26,7 @@ export async function processDeliveryJobs() {
         ]);
         if(settingsError || secretError) throw new Error("lookup failed");
         if(!settings?.meta_pixel_id || !/^\d{5,30}$/.test(settings.meta_pixel_id) || !secret?.meta_access_token) {permanent=true;throw new Error("not configured");}
-        const response=await fetch("https://graph.facebook.com/"+(process.env.META_GRAPH_VERSION || "v23.0")+"/"+settings.meta_pixel_id+"/events",{
+        const response=await fetch("https://graph.facebook.com/"+(process.env.META_GRAPH_VERSION || "v24.0")+"/"+settings.meta_pixel_id+"/events",{
           method:"POST",redirect:"error",signal:AbortSignal.timeout(8000),headers:{"Content-Type":"application/json"},
           body:JSON.stringify({access_token:secret.meta_access_token,data:[job.payload]}),
         });

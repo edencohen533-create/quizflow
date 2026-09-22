@@ -24,7 +24,7 @@ export const POST = securePost(async (_req, body) => {
   }
 
   try {
-    const res = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events`, {
+    const res = await fetch(`https://graph.facebook.com/${process.env.META_GRAPH_VERSION || "v24.0"}/${pixelId}/events`, {
       method: "POST",
       redirect: "error",
       signal: AbortSignal.timeout(8000),
