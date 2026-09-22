@@ -54,16 +54,12 @@ function Avatar({ url, size = 34 }: { url?: string; size?: number }) {
       <img
         src={url}
         alt=""
-        className="shrink-0 rounded-full object-cover shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
+        className="shrink-0 rounded-full bg-white object-contain"
         style={{ width: size, height: size }}
       />
     );
   }
   return <SunAvatar size={size} />;
-}
-
-function timeLabel(ts: number) {
-  return new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
 }
 
 function uid() {
@@ -363,9 +359,9 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   }
 
   return (
-    <div dir="rtl" className="qf-runner-bg min-h-screen" style={{ fontFamily: PALETTE.fontFamily, fontSize: PALETTE.fontSize }}>
+    <div dir="rtl" className="qf-runner-bg min-h-screen" style={{ fontFamily: PALETTE.fontFamily, fontSize: PALETTE.fontSize, fontWeight: 500 }}>
       <style>{`.qf-runner-bg{background:${desktopBg};}@media (max-width:767px){.qf-runner-bg{background:${mobileBg};}}`}</style>
-      <div className="mx-auto max-w-2xl px-4 pb-32 pt-6 sm:px-6">
+      <div className="mx-auto max-w-[680px] px-4 pb-24 pt-6 sm:px-6 sm:pt-10">
         <div className="space-y-5">
           {entries.map((entry) => {
             if (entry.kind === "user") {
@@ -378,7 +374,6 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
                     >
                       {entry.text}
                     </div>
-                    <span className="px-1 text-xs" style={{ color: PALETTE.muted }}>{timeLabel(entry.ts)}</span>
                   </div>
                 </div>
               );
@@ -413,26 +408,27 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
             const imageCard = blockImageUrl && (
               <div
                 key="image"
-                className={`w-full bg-white p-6 shadow-sm sm:p-8 ${imageBelow ? "mt-3" : "mb-3"}`}
-                style={{ borderRadius: PALETTE.radius }}
+                className={`self-start bg-white px-6 py-8 sm:px-8 sm:py-12 ${imageBelow ? "mt-1.5" : "mb-1.5"}`}
+                style={{ width: "calc(100% - 36px)", maxWidth: 528, marginInlineStart: 36, borderRadius: `${PALETTE.radius}px ${PALETTE.radius}px ${PALETTE.radius}px 2px` }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={blockImageUrl} alt="" className="mx-auto max-h-40 w-full max-w-[62%] object-contain sm:max-h-48" />
+                <img src={blockImageUrl} alt="" className="mx-auto block h-auto w-full max-w-[80%] object-contain" />
               </div>
             );
             const bubbleRow = (
-              <div key="bubble" className="flex min-w-0 items-end gap-2">
+              <div key="bubble" className="flex w-full min-w-0 items-end gap-0.5">
                 <Avatar url={quiz.theme.avatarUrl} />
                 <div
-                  className="min-w-0 px-5 py-4 leading-relaxed"
-                  style={{ background: PALETTE.bubbleBot, color: PALETTE.text, borderRadius: PALETTE.radius }}
+                  className="min-w-0 flex-1 px-5 py-4 leading-[1.4] sm:px-6"
+                  style={{ background: PALETTE.bubbleBot, color: PALETTE.text, borderRadius: `${PALETTE.radius}px ${PALETTE.radius}px ${PALETTE.radius}px 2px`, overflowWrap: "anywhere" }}
                 >
                   <BotNodeContent node={node} params={paramValues} />
                 </div>
               </div>
             );
             const controlsRow = isActive && (
-              <div key="controls" className="mt-3 w-full">
+              <div key="controls" className="mt-4 self-start"
+                style={{ width: "calc(100% - 36px)", marginInlineStart: 36 }}>
                 <NodeControls
                   node={node}
                   palette={PALETTE}
@@ -445,9 +441,8 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
 
             return (
               <div key={entry.id} className="flex justify-start">
-                <div ref={isActive ? activeNodeRef : undefined} className="flex max-w-[85%] flex-col items-end gap-1">
+                <div ref={isActive ? activeNodeRef : undefined} className="flex w-full min-w-0 flex-col items-end">
                   {imageBelow ? [bubbleRow, imageCard] : [imageCard, bubbleRow]}
-                  <span className="px-1 text-xs" style={{ color: PALETTE.muted }}>{timeLabel(entry.ts)}</span>
                   {controlsRow}
                   {isActive && history.length > 1 && (
                     <button
@@ -467,14 +462,14 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
         </div>
       </div>
 
-      <button
+      {entries.length > 1 && <button
         onClick={scrollToBottom}
         className="fixed bottom-6 left-1/2 flex size-11 -translate-x-1/2 items-center justify-center rounded-full bg-white shadow-lg"
         style={{ color: PALETTE.buttonText }}
         aria-label="גלול למטה"
       >
         <ChevronDown className="size-5" />
-      </button>
+      </button>}
     </div>
   );
 }
@@ -540,7 +535,7 @@ function NodeControls({
     return (
       <button
         onClick={() => onComplete(data.buttonLabel || "המשך", null)}
-        className="rounded-lg border-2 bg-white px-6 py-2.5 text-sm font-semibold transition-transform active:scale-[0.97]"
+        className="min-h-[50px] w-full rounded-[4px] border-2 bg-white px-6 py-3 text-[length:inherit] font-medium transition-transform active:scale-[0.97] sm:w-[31%] sm:min-w-[140px]"
         style={{ borderColor: PALETTE.buttonBorder, color: PALETTE.buttonText }}
       >
         {data.buttonLabel || "המשך"}
@@ -588,7 +583,7 @@ function NodeControls({
                 onClick={() =>
                   onComplete(opt.label, data.combineAnswers ? null : opt.id, { nodeId: node.id, questionTitle: data.title, answerLabel: opt.label, score: opt.score, paramKey: data.paramKey })
                 }
-                className="rounded-lg border-2 bg-white px-4 py-3 text-sm font-semibold transition-transform active:scale-[0.97] sm:min-w-[140px] sm:basis-[31%] sm:grow-0"
+                className="min-h-[50px] rounded-[4px] border-2 bg-white px-4 py-3 text-[length:inherit] font-medium transition-transform active:scale-[0.97] sm:min-w-[140px] sm:basis-[31%] sm:grow-0"
                 style={{ borderColor: PALETTE.buttonBorder, color: PALETTE.buttonText }}
               >
                 {opt.label}
@@ -611,7 +606,7 @@ function NodeControls({
                   key={opt.id}
                   type="button"
                   onClick={() => setMulti((m) => (checked ? m.filter((id) => id !== opt.id) : [...m, opt.id]))}
-                  className="flex items-center gap-2 rounded-lg border-2 bg-white px-4 py-3 text-sm font-semibold sm:min-w-[140px] sm:basis-[31%] sm:grow-0"
+                  className="flex items-center gap-2 min-h-[50px] rounded-[4px] border-2 bg-white px-4 py-3 text-[length:inherit] font-medium sm:min-w-[140px] sm:basis-[31%] sm:grow-0"
                   style={{ borderColor: checked ? PALETTE.buttonText : PALETTE.buttonBorder, color: PALETTE.buttonText }}
                 >
                   <Checkbox checked={checked} />
