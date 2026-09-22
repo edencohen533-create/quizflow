@@ -13,6 +13,7 @@ import {
 } from "@/lib/types";
 
 export interface QuizRow {
+  flow_revision?: number;
   id: string;
   workspace_id: string;
   name: string;
@@ -165,6 +166,7 @@ export function quizRowToQuiz(
 ): Quiz {
   return {
     id: quizRow.id,
+    flowRevision: quizRow.flow_revision ?? 0,
     workspaceId: quizRow.workspace_id,
     name: quizRow.name,
     description: quizRow.description ?? undefined,

@@ -1,3 +1,5 @@
+import { headers } from "next/headers";
+import { sharedBudget } from "@/lib/security/shared-rate-limit";
 import { notFound } from "next/navigation";
 import { issuePublicSession } from "@/lib/security/session";
 import { Suspense } from "react";
@@ -13,6 +15,9 @@ export default async function PublicQuizPage({ params }: { params: Promise<{ slu
   // and would never match the plain slug stored in the database.
   let slug: string;
   try { slug = decodeURIComponent(rawSlug); } catch { notFound(); }
+  const incoming = await headers();
+  const budgetRequest = new Request("https://quizflow.invalid/q/", { headers: incoming });
+  if (!await sharedBudget(budgetRequest,"public-session",60)) return <main dir="rtl">יותר מדי בקשות. נסו שוב בעוד דקה.</main>;
   const supabase = await createClient();
   const quiz = await fetchQuizFullBySlug(supabase, slug);
 

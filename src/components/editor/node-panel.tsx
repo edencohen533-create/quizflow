@@ -521,15 +521,16 @@ function ConditionForm({ data, onChange }: { data: ConditionNodeData; onChange: 
         הגדר תנאים לבדיקה. יעד המסלול נקבע ע&quot;י חיבור בין הצומת לצמתים הבאים בקנבס.
       </p>
       {data.rules.map((rule) => (
-        <div key={rule.id} className="rounded-lg border p-2 flex items-center gap-1.5 text-xs">
-          <span className="flex-1">
-            {rule.sourceField} {rule.operator} {rule.value}
-          </span>
-          <Button variant="ghost" size="icon" className="size-6 text-destructive" onClick={() => removeRule(rule.id)}>
-            <Trash2 className="size-3" />
-          </Button>
+        <div key={rule.id} className="rounded-lg border p-2 space-y-2 text-xs">
+          <label>שדה<select className="w-full border rounded p-1" value={rule.sourceField} onChange={e=>onChange({...data,rules:data.rules.map(r=>r.id===rule.id?{...r,sourceField:e.target.value as "score"|"utm_source"|"answer"}:r)})}><option value="score">ניקוד</option><option value="utm_source">מקור תנועה</option><option value="answer">תשובה לשאלה</option></select></label>
+          {rule.sourceField==="answer"&&<Input aria-label="מזהה שאלה בתנאי" placeholder="מזהה הצומת של השאלה" value={rule.answerNodeId??""} onChange={e=>onChange({...data,rules:data.rules.map(r=>r.id===rule.id?{...r,answerNodeId:e.target.value}:r)})}/>}
+          <label>השוואה<select className="w-full border rounded p-1" value={rule.operator} onChange={e=>onChange({...data,rules:data.rules.map(r=>r.id===rule.id?{...r,operator:e.target.value as typeof r.operator}:r)})}>{["eq","gt","gte","lt","lte"].map(op=><option key={op} value={op}>{op}</option>)}</select></label>
+          <Input aria-label="ערך התנאי" value={rule.value} onChange={e=>onChange({...data,rules:data.rules.map(r=>r.id===rule.id?{...r,value:e.target.value}:r)})}/>
+          <Input aria-label="יעד התנאי" placeholder="מזהה צומת היעד" value={rule.targetNodeId??""} onChange={e=>onChange({...data,rules:data.rules.map(r=>r.id===rule.id?{...r,targetNodeId:e.target.value||null}:r)})}/>
+          <Button variant="ghost" size="sm" onClick={() => removeRule(rule.id)}>מחיקת תנאי</Button>
         </div>
       ))}
+      <Field label="יעד כשאין התאמה"><Input placeholder="מזהה צומת ברירת המחדל" value={data.elseNodeId??""} onChange={e=>onChange({...data,elseNodeId:e.target.value||null})}/></Field>
       <Button variant="outline" size="sm" className="w-full" onClick={addRule}>
         <Plus className="size-3.5" /> הוסף תנאי
       </Button>

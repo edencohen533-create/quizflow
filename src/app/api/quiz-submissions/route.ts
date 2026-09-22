@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { processDeliveryJobs } from "@/lib/security/delivery";
 import { NextResponse } from "next/server";
 import { securePost, HttpError, isRecord, stringField } from "@/lib/security/http";
 import { requirePublicQuiz } from "@/lib/security/public-quiz";
@@ -31,25 +33,20 @@ export const POST = securePost(async (req, body) => {
     utm_medium: stringField(lead.utmMedium, 256) || null,
     utm_campaign: stringField(lead.utmCampaign, 256) || null,
   };
-  // Fixed signed IDs make network retries idempotent. Do not overwrite completed
-  // lead data on replay. A database transaction remains a separate migration.
-  const { error: leadError } = await admin.from("leads").upsert({
-    id: session.leadId, workspace_id: quiz.workspaceId, quiz_id: quiz.id,
-    name, phone, email, score, category, status: "new", ...attribution,
-    utm_content: stringField(lead.utmContent, 256) || null,
-  }, { onConflict: "id", ignoreDuplicates: true });
-  if (leadError) throw new HttpError(503, "Could not save contact details");
-  const { error: submissionError } = await admin.from("quiz_submissions").upsert({
-    id: session.submissionId, quiz_id: quiz.id, lead_id: session.leadId, score, category, ...attribution,
-  }, { onConflict: "id", ignoreDuplicates: true });
-  if (submissionError) throw new HttpError(503, "Could not save submission");
-  if (answers.length) {
-    const { error } = await admin.from("submission_answers").upsert(answers.map((a) => ({
+  const { error } = await admin.rpc("submit_quiz_response", {
+    p_lead: {
+      id: session.leadId, workspace_id: quiz.workspaceId, quiz_id: quiz.id,
+      name, phone, email, score, category, ...attribution,
+      utm_content: stringField(lead.utmContent, 256) || null,
+    },
+    p_submission: { id: session.submissionId, quiz_id: quiz.id, lead_id: session.leadId, score, category, ...attribution },
+    p_answers: answers.map((a) => ({
       id: operationId("answer:" + a.nodeId, session.submissionId),
-      submission_id: session.submissionId, node_id: a.nodeId,
-      question_title: a.questionTitle, answer_label: a.answerLabel, score: a.score, param_key: a.paramKey || null,
-    })), { onConflict: "id", ignoreDuplicates: true });
-    if (error) throw new HttpError(503, "Could not save answers");
-  }
+      node_id: a.nodeId, question_title: a.questionTitle, answer_label: a.answerLabel,
+      score: a.score, param_key: a.paramKey || null,
+    })),
+  });
+  if (error) throw new HttpError(503, "Could not save submission");
+  after(() => processDeliveryJobs());
   return NextResponse.json({ ok: true, leadId: session.leadId });
 });

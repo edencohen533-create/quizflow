@@ -119,12 +119,14 @@ interface HistoryEntry {
 function FlowEditorInner({
   quizId,
   initialNodes,
+  initialRevision,
   initialEdges,
   onSavedIndicator,
   saveRef,
 }: {
   quizId: string;
   initialNodes: QuizNode[];
+  initialRevision: number;
   initialEdges: QuizEdge[];
   onSavedIndicator: (label: string) => void;
   saveRef?: { current: (() => Promise<void>) | null };
@@ -144,6 +146,7 @@ function FlowEditorInner({
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveRevision = useRef(0);
   const dirtyRef = useRef(false);
+  const databaseRevision = useRef({ revision: initialRevision });
 
   const domainNodesRef = useRef<QuizNode[]>(initialNodes);
   const domainEdgesRef = useRef<QuizEdge[]>(initialEdges);
@@ -175,13 +178,13 @@ function FlowEditorInner({
       saveTimer.current = setTimeout(async () => {
         saveTimer.current = null;
         try {
-          await saveFlowToSupabase(supabase, quizId, dn, de);
+          await saveFlowToSupabase(supabase, quizId, dn, de, databaseRevision.current);
           if (revision === saveRevision.current) {
             dirtyRef.current = false;
             onSavedIndicator("נשמר לפני רגע");
           }
-        } catch {
-          if (revision === saveRevision.current) onSavedIndicator("השמירה נכשלה — השינויים לא נשמרו");
+        } catch (error) {
+          if (revision === saveRevision.current) onSavedIndicator(error instanceof Error ? error.message : "השמירה נכשלה — השינויים לא נשמרו");
         }
       }, 500);
     },
@@ -194,7 +197,7 @@ function FlowEditorInner({
     const revision = ++saveRevision.current;
     onSavedIndicator("שומר...");
     try {
-      await saveFlowToSupabase(supabase, quizId, domainNodesRef.current, domainEdgesRef.current);
+      await saveFlowToSupabase(supabase, quizId, domainNodesRef.current, domainEdgesRef.current, databaseRevision.current);
       if (revision === saveRevision.current) { dirtyRef.current = false; onSavedIndicator("נשמר לפני רגע"); }
     } catch (error) {
       onSavedIndicator("השמירה נכשלה — השינויים לא נשמרו");
@@ -217,7 +220,7 @@ function FlowEditorInner({
       if (saveTimer.current) {
         clearTimeout(saveTimer.current);
         saveTimer.current = null;
-        void saveFlowToSupabase(supabase, quizId, domainNodesRef.current, domainEdgesRef.current).catch(() => {
+        void saveFlowToSupabase(supabase, quizId, domainNodesRef.current, domainEdgesRef.current, databaseRevision.current).catch(() => {
           onSavedIndicator("השמירה נכשלה — השינויים לא נשמרו");
         });
       }
@@ -500,6 +503,7 @@ function FlowEditorInner({
 export function FlowEditor(props: {
   quizId: string;
   initialNodes: QuizNode[];
+  initialRevision: number;
   initialEdges: QuizEdge[];
   onSavedIndicator: (label: string) => void;
   saveRef?: { current: (() => Promise<void>) | null };

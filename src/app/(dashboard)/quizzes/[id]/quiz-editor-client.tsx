@@ -1,4 +1,5 @@
 "use client";
+import { validatePublishableFlow } from "@/lib/quiz-runtime";
 
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -65,6 +66,8 @@ export function QuizEditorClient({ initialQuiz }: { initialQuiz: Quiz }) {
     // so validating against `quiz.nodes` here would check a stale snapshot.
     const current = await fetchQuizFull(supabase, quiz.id);
     if (!current) return;
+    const flowErrors = validatePublishableFlow(current);
+    if (flowErrors.length) { toast.error(flowErrors.join("; ")); return; }
     const hasStart = current.nodes.some((n) => n.type === "start");
     const hasEnd = current.nodes.some((n) => n.type === "end");
     if (!hasStart || !hasEnd) {
@@ -163,6 +166,7 @@ export function QuizEditorClient({ initialQuiz }: { initialQuiz: Quiz }) {
           <FlowEditor
             quizId={quiz.id}
             initialNodes={quiz.nodes}
+            initialRevision={quiz.flowRevision ?? 0}
             initialEdges={quiz.edges}
             onSavedIndicator={setSavedAgo}
             saveRef={flowSaveRef}
