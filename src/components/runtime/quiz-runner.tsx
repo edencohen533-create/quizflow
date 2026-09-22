@@ -421,7 +421,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
               <div key="bubble" className="flex w-full min-w-0 items-end gap-0.5">
                 <Avatar url={quiz.theme.avatarUrl} />
                 <div
-                  className="min-w-0 flex-1 px-5 py-4 leading-[1.35] sm:px-6"
+                  className="w-fit min-w-0 max-w-[calc(100%-36px)] px-5 py-4 leading-[1.35] sm:px-6"
                   style={{ background: PALETTE.bubbleBot, color: PALETTE.text, borderRadius: `${PALETTE.radius}px ${PALETTE.radius}px ${PALETTE.radius}px 2px`, overflowWrap: "anywhere" }}
                 >
                   <BotNodeContent node={node} params={paramValues} />
