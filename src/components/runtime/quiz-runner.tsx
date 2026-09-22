@@ -410,7 +410,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
             const imageCard = blockImageUrl && (
               <div
                 key="image"
-                className={`self-start bg-white px-6 py-8 sm:px-8 sm:py-12 ${imageBelow ? "mt-1.5" : "mb-1.5"}`}
+                className={`self-start bg-white px-6 py-8 sm:px-8 sm:py-10 ${imageBelow ? "mt-1.5" : "mb-1.5"}`}
                 style={{ width: "calc(100% - 36px)", maxWidth: 528, marginInlineStart: 36, borderRadius: `${PALETTE.radius}px ${PALETTE.radius}px ${PALETTE.radius}px 2px` }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -421,7 +421,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
               <div key="bubble" className="flex w-full min-w-0 items-end gap-0.5">
                 <Avatar url={quiz.theme.avatarUrl} />
                 <div
-                  className="min-w-0 flex-1 px-5 py-4 leading-[1.4] sm:px-6"
+                  className="min-w-0 flex-1 px-5 py-4 leading-[1.35] sm:px-6"
                   style={{ background: PALETTE.bubbleBot, color: PALETTE.text, borderRadius: `${PALETTE.radius}px ${PALETTE.radius}px ${PALETTE.radius}px 2px`, overflowWrap: "anywhere" }}
                 >
                   <BotNodeContent node={node} params={paramValues} />
@@ -485,7 +485,13 @@ function BotNodeContent({ node, params }: { node: QuizNode; params: Record<strin
   if (node.data.kind === "message") {
     // the image (if any) renders as its own separate floating card above
     // this bubble — see the "bot" entry case in the main render.
-    return <p className="whitespace-pre-line">{renderRichText(interpolateParams(node.data.text, params))}</p>;
+    const text = interpolateParams(node.data.text, params);
+    // Keep an introductory greeting with its paragraph, as in the welcome
+    // card design. Preserve all other authored paragraph and line breaks.
+    const displayText = node.data.imageUrl
+      ? text.replace(/^(היי|הי|שלום)([^\n]*)\n(?:[ \t]*\n)+/u, "$1$2\n")
+      : text;
+    return <p className="whitespace-pre-line">{renderRichText(displayText)}</p>;
   }
   if (node.data.kind === "question") {
     // the image (if any) renders as its own separate floating card, above
