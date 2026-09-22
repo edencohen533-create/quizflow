@@ -72,58 +72,55 @@ export async function getWorkspaceIdForUser(supabase: SupabaseClient): Promise<s
   return findOrCreateWorkspace(supabase, session.user.id);
 }
 
-export async function listQuizzes(supabase: SupabaseClient, workspaceId: string): Promise<Quiz[]> {
-  const [{ data: quizRows, error }, { data: themeRows }] = await Promise.all([
-    supabase.from("quizzes").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }),
-    supabase.from("quiz_themes").select("*"),
-  ]);
-  if (error) throw error;
-  const themesByQuiz = new Map((themeRows ?? []).map((t: QuizThemeRow) => [t.quiz_id, t]));
-  return (quizRows ?? []).map((q: QuizRow) =>
-    quizRowToQuiz(q, [], [], themesByQuiz.get(q.id) ?? defaultThemeRow(q.id))
-  );
+// PostgREST embeds related rows in one request and applies RLS to each
+// relation. Keep the same caller's client: draft previews remain owner-only.
+interface QuizWithRelations extends QuizRow {
+  quiz_nodes?: QuizNodeRow[];
+  quiz_edges?: QuizEdgeRow[];
+  quiz_themes: QuizThemeRow | QuizThemeRow[] | null;
 }
 
 function defaultThemeRow(quizId: string): QuizThemeRow {
   return themeToRow(quizId, THEME_PRESETS.clean_light);
 }
 
-async function fetchQuizFlow(supabase: SupabaseClient, quizId: string) {
-  const [{ data: nodeRows }, { data: edgeRows }, { data: themeRow }] = await Promise.all([
-    supabase.from("quiz_nodes").select("*").eq("quiz_id", quizId),
-    supabase.from("quiz_edges").select("*").eq("quiz_id", quizId),
-    supabase.from("quiz_themes").select("*").eq("quiz_id", quizId).maybeSingle(),
-  ]);
-  return {
-    nodeRows: (nodeRows ?? []) as QuizNodeRow[],
-    edgeRows: (edgeRows ?? []) as QuizEdgeRow[],
-    themeRow: (themeRow as QuizThemeRow | null) ?? defaultThemeRow(quizId),
-  };
+function mapQuizWithRelations(row: QuizWithRelations): Quiz {
+  const theme = Array.isArray(row.quiz_themes) ? row.quiz_themes[0] : row.quiz_themes;
+  return quizRowToQuiz(row, row.quiz_nodes ?? [], row.quiz_edges ?? [], theme ?? defaultThemeRow(row.id));
+}
+
+const QUIZ_WITH_FLOW = "*, quiz_nodes(*), quiz_edges(*), quiz_themes(*)";
+
+export async function listQuizzes(supabase: SupabaseClient, workspaceId: string): Promise<Quiz[]> {
+  const { data, error } = await supabase
+    .from("quizzes")
+    .select("*, quiz_themes(*)")
+    .eq("workspace_id", workspaceId)
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as unknown as QuizWithRelations[]).map(mapQuizWithRelations);
 }
 
 export async function fetchQuizFull(supabase: SupabaseClient, quizId: string): Promise<Quiz | null> {
-  // The quiz row and its flow (nodes/edges/theme) don't depend on each
-  // other — both only need quizId, which is already known — so fetch them
-  // concurrently instead of waiting on the quiz row first.
-  const [{ data: quizRow, error }, flow] = await Promise.all([
-    supabase.from("quizzes").select("*").eq("id", quizId).maybeSingle(),
-    fetchQuizFlow(supabase, quizId),
-  ]);
+  const { data, error } = await supabase
+    .from("quizzes")
+    .select(QUIZ_WITH_FLOW)
+    .eq("id", quizId)
+    .maybeSingle();
   if (error) throw error;
-  if (!quizRow) return null;
-  return quizRowToQuiz(quizRow, flow.nodeRows, flow.edgeRows, flow.themeRow);
+  return data ? mapQuizWithRelations(data as unknown as QuizWithRelations) : null;
 }
 
 export async function fetchQuizFullBySlug(supabase: SupabaseClient, slug: string): Promise<Quiz | null> {
-  // no status filter here: RLS already restricts anonymous visitors to
-  // active quizzes (quizzes_public_read_active) while letting the owner
-  // see their own quiz regardless of status (quizzes_owner_all) — this is
-  // what makes "preview" work for draft/paused quizzes.
-  const { data: quizRow, error } = await supabase.from("quizzes").select("*").eq("slug", slug).maybeSingle();
+  // RLS permits anonymous active quizzes and authenticated owner previews.
+  // Do not cache this result across users or add an active-only filter.
+  const { data, error } = await supabase
+    .from("quizzes")
+    .select(QUIZ_WITH_FLOW)
+    .eq("slug", slug)
+    .maybeSingle();
   if (error) throw error;
-  if (!quizRow) return null;
-  const { nodeRows, edgeRows, themeRow } = await fetchQuizFlow(supabase, quizRow.id);
-  return quizRowToQuiz(quizRow, nodeRows, edgeRows, themeRow);
+  return data ? mapQuizWithRelations(data as unknown as QuizWithRelations) : null;
 }
 
 export async function createQuiz(
@@ -266,6 +263,52 @@ export async function listRecentLeads(
     quizName: (r.quizzes as unknown as { name: string } | null)?.name ?? "",
     status: r.status as LeadStatus,
   }));
+}
+
+// List rows and CSV export do not use answers, notes, or status history.
+// Fetch those only when the operator opens one lead.
+export async function listLeadSummaries(supabase: SupabaseClient, workspaceId: string): Promise<Lead[]> {
+  const { data, error } = await supabase
+    .from("leads")
+    .select("*, quizzes(name)")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as LeadRow[]).map((row) => leadRowToLead(row, [], [], []));
+}
+
+interface LeadWithDetails extends LeadRow {
+  lead_notes: { id: string; text: string; created_at: string }[];
+  lead_status_history: { status: LeadStatus; created_at: string }[];
+  quiz_submissions: {
+    submission_answers: { node_id: string; question_title: string | null; answer_label: string | null; score: number; param_key: string | null }[];
+  }[];
+}
+
+export async function getLeadDetails(supabase: SupabaseClient, workspaceId: string, leadId: string): Promise<Lead | null> {
+  const { data, error } = await supabase
+    .from("leads")
+    .select("*, quizzes(name), lead_notes(id, text, created_at), lead_status_history(status, created_at), quiz_submissions(submission_answers(node_id, question_title, answer_label, score, param_key))")
+    .eq("workspace_id", workspaceId)
+    .eq("id", leadId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const row = data as unknown as LeadWithDetails;
+  const answers = (row.quiz_submissions ?? []).flatMap((submission) =>
+    (submission.submission_answers ?? []).map((answer) => ({
+      nodeId: answer.node_id,
+      questionTitle: answer.question_title ?? "",
+      answerLabel: answer.answer_label ?? "",
+      score: answer.score,
+      paramKey: answer.param_key ?? undefined,
+    }))
+  );
+  const notes = (row.lead_notes ?? []).map((note) => ({ id: note.id, text: note.text, createdAt: note.created_at }));
+  const history = (row.lead_status_history ?? [])
+    .map((entry) => ({ status: entry.status, at: entry.created_at }))
+    .sort((a, b) => a.at.localeCompare(b.at));
+  return leadRowToLead(row, answers, notes, history);
 }
 
 export async function listLeads(supabase: SupabaseClient, workspaceId: string): Promise<Lead[]> {

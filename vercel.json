@@ -1,0 +1,3 @@
+{
+  "buildCommand": "npm run check:performance && npm run build"
+}
