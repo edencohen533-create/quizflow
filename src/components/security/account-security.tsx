@@ -9,7 +9,7 @@ export function AccountSecurity(){
  useEffect(()=>{void supabase.auth.mfa.listFactors().then(({data,error})=>{if(error)setMessage("לא ניתן לטעון את מצב האימות");else setEnabled(!!data?.totp.some(f=>f.status==="verified"));});},[supabase]);
  async function enroll(){setBusy(true);try{
   const {data:existing}=await supabase.auth.mfa.listFactors();
-  for(const f of existing?.totp??[])if(f.status==="unverified")await supabase.auth.mfa.unenroll({factorId:f.id});
+  for(const f of existing?.all??[])if(f.status==="unverified")await supabase.auth.mfa.unenroll({factorId:f.id});
   const {data,error}=await supabase.auth.mfa.enroll({factorType:"totp",friendlyName:"QuizFlow authenticator"});
   if(error||!data)throw error;setFactor({id:data.id,qr:data.totp.qr_code});setMessage("סרקו באפליקציית אימות והזינו את הקוד.");
  }catch{setMessage("הגדרת האימות נכשלה");}finally{setBusy(false);}}

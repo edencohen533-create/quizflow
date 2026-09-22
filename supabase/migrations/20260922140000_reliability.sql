@@ -58,6 +58,7 @@ create or replace function public.save_quiz_flow(p_quiz_id uuid,p_expected_revis
 returns bigint language plpgsql security definer set search_path=public,pg_temp as $$
 declare revision bigint;
 begin
+ if coalesce(auth.jwt()->>'aal','aal1')<>'aal2' and exists(select 1 from auth.mfa_factors where user_id=auth.uid() and status='verified') then raise exception 'MFA required' using errcode='42501'; end if;
  select q.flow_revision into revision from public.quizzes q join public.workspaces w on w.id=q.workspace_id
  where q.id=p_quiz_id and w.owner_id=auth.uid() for update of q;
  if not found then raise exception 'Not authorized' using errcode='42501'; end if;

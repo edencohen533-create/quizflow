@@ -211,6 +211,7 @@ function FlowEditorInner({
   }, [saveRef, flushSave]);
 
   useEffect(() => {
+    const savedRevision = databaseRevision.current;
     const warnUnsaved = (event: BeforeUnloadEvent) => {
       if (dirtyRef.current) { event.preventDefault(); event.returnValue = ""; }
     };
@@ -220,7 +221,7 @@ function FlowEditorInner({
       if (saveTimer.current) {
         clearTimeout(saveTimer.current);
         saveTimer.current = null;
-        void saveFlowToSupabase(supabase, quizId, domainNodesRef.current, domainEdgesRef.current, databaseRevision.current).catch(() => {
+        void saveFlowToSupabase(supabase, quizId, domainNodesRef.current, domainEdgesRef.current, savedRevision).catch(() => {
           onSavedIndicator("השמירה נכשלה — השינויים לא נשמרו");
         });
       }
