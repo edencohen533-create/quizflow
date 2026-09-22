@@ -1,80 +1,37 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { QuizSessionAnswer } from "@/lib/types";
+import { NextResponse } from "next/server";
+import { requirePublicQuiz } from "@/lib/security/public-quiz";
+import { securePost, HttpError, stringField } from "@/lib/security/http";
+import { normalizeAnswers } from "@/lib/security/answers";
 
-interface TrackBody {
-  sessionId?: string;
-  quizId?: string;
-  stepIndex?: number;
-  totalSteps?: number;
-  currentNodeId?: string;
-  currentNodeTitle?: string;
-  status?: "active" | "completed";
-  name?: string;
-  phone?: string;
-  email?: string;
-  score?: number;
-  category?: string;
-  utmSource?: string;
-  utmMedium?: string;
-  utmCampaign?: string;
-  answers?: QuizSessionAnswer[];
-}
-
-export async function POST(req: NextRequest) {
-  let body: TrackBody;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "invalid JSON body" }, { status: 400 });
-  }
-  const { sessionId, quizId } = body;
-  if (!sessionId || !quizId) {
-    return NextResponse.json({ ok: false, error: "missing sessionId or quizId" }, { status: 400 });
-  }
-
-  // Anonymous-safe: only succeeds against a published quiz, same rule the
-  // public runtime itself relies on to load the quiz. workspace_id / quiz
-  // name are derived server-side from the quiz row, never trusted from
-  // the client, so a visitor can't spoof which workspace this lands in.
-  const supabase = await createClient();
-  const { data: quiz } = await supabase
-    .from("quizzes")
-    .select("id, name, workspace_id")
-    .eq("id", quizId)
-    .eq("status", "active")
-    .maybeSingle();
-  if (!quiz) {
-    return NextResponse.json({ ok: false, error: "quiz not found or not published" }, { status: 404 });
-  }
-
-  const admin = createAdminClient();
+export const POST = securePost(async (req, body) => {
+  const { session, admin, quiz } = await requirePublicQuiz(req);
+  if (body.quizId !== quiz.id || body.sessionId !== session.sessionId) throw new HttpError(403, "Not authorized");
+  const nodeId = stringField(body.currentNodeId, 128, true);
+  const node = quiz.nodes.find((n) => n.id === nodeId);
+  if (!node || !["active", "completed"].includes(String(body.status))) throw new HttpError(400, "Invalid step");
+  if (body.status === "completed" && node.type !== "end") throw new HttpError(400, "Invalid completion");
+  const answers = normalizeAnswers(body.answers ?? [], quiz.nodes);
+  const score = answers.reduce((sum, a) => sum + a.score, 0);
   const now = new Date().toISOString();
-  const { error } = await admin.from("quiz_sessions").upsert({
-    id: sessionId,
-    quiz_id: quiz.id,
-    workspace_id: quiz.workspace_id,
-    quiz_name: quiz.name,
-    step_index: body.stepIndex ?? 0,
-    total_steps: body.totalSteps ?? 0,
-    current_node_id: body.currentNodeId ?? null,
-    current_node_title: body.currentNodeTitle ?? null,
-    status: body.status ?? "active",
-    name: body.name ?? null,
-    phone: body.phone ?? null,
-    email: body.email ?? null,
-    score: body.score ?? 0,
-    category: body.category ?? null,
-    utm_source: body.utmSource ?? null,
-    utm_medium: body.utmMedium ?? null,
-    utm_campaign: body.utmCampaign ?? null,
-    answers: body.answers ?? [],
-    last_event_at: now,
-    completed_at: body.status === "completed" ? now : null,
-  });
-  if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  }
+  const row = {
+    id: session.sessionId, quiz_id: quiz.id, workspace_id: quiz.workspaceId, quiz_name: quiz.name,
+    step_index: answers.length,
+    total_steps: quiz.nodes.filter((n) => ["question", "name", "lead_details"].includes(n.type)).length,
+    current_node_id: node.id,
+    current_node_title: "title" in node.data ? node.data.title : node.data.kind === "message" ? node.data.text : node.type,
+    status: body.status as "active" | "completed",
+    name: stringField(body.name, 200) || null, phone: stringField(body.phone, 40) || null, email: stringField(body.email, 254) || null,
+    score, category: score >= 26 ? "hot" : score >= 16 ? "warm" : "cold",
+    utm_source: stringField(body.utmSource, 256) || null,
+    utm_medium: stringField(body.utmMedium, 256) || null,
+    utm_campaign: stringField(body.utmCampaign, 256) || null,
+    answers, last_event_at: now, completed_at: body.status === "completed" ? now : null,
+  };
+  const { error: insertError } = await admin.from("quiz_sessions").upsert(row, { onConflict: "id", ignoreDuplicates: true });
+  if (insertError) throw new HttpError(503, "Could not start session");
+  // A delayed heartbeat must never reopen a completed session.
+  const { error } = await admin.from("quiz_sessions").update(row)
+    .eq("id", session.sessionId).eq("quiz_id", quiz.id).eq("workspace_id", quiz.workspaceId).neq("status", "completed");
+  if (error) throw new HttpError(503, "Could not update session");
   return NextResponse.json({ ok: true });
-}
+});

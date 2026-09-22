@@ -384,64 +384,19 @@ export async function deleteLead(supabase: SupabaseClient, leadId: string) {
 // Public (anonymous-safe) submission path: ids are generated client-side so we
 // never need a SELECT back on rows that anon isn't allowed to read.
 export async function submitPublicQuizResponse(
-  supabase: SupabaseClient,
-  quiz: Quiz,
-  lead: {
-    name: string;
-    phone: string;
-    email: string;
-    score: number;
-    category: "hot" | "warm" | "cold";
-    utmSource?: string;
-    utmMedium?: string;
-    utmCampaign?: string;
-    utmContent?: string;
-  },
-  answers: LeadAnswer[]
+  _supabase: SupabaseClient,
+  _quiz: Quiz,
+  lead: { name: string; phone: string; email: string; consent?: boolean; score: number; category: "hot" | "warm" | "cold"; utmSource?: string; utmMedium?: string; utmCampaign?: string; utmContent?: string },
+  answers: LeadAnswer[],
+  session: import("@/lib/public-session").PublicSession
 ) {
-  const leadId = crypto.randomUUID();
-  const submissionId = crypto.randomUUID();
-
-  const { error: leadError } = await supabase.from("leads").insert({
-    id: leadId,
-    workspace_id: quiz.workspaceId,
-    quiz_id: quiz.id,
-    name: lead.name,
-    phone: lead.phone,
-    email: lead.email,
-    score: lead.score,
-    category: lead.category,
-    status: "new",
-    utm_source: lead.utmSource ?? null,
-    utm_medium: lead.utmMedium ?? null,
-    utm_campaign: lead.utmCampaign ?? null,
-    utm_content: lead.utmContent ?? null,
+  const response = await fetch("/api/quiz-submissions", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.token },
+    body: JSON.stringify({ lead, answers }),
   });
-  if (leadError) throw leadError;
-
-  await supabase.from("quiz_submissions").insert({
-    id: submissionId,
-    quiz_id: quiz.id,
-    lead_id: leadId,
-    score: lead.score,
-    category: lead.category,
-    utm_source: lead.utmSource ?? null,
-    utm_medium: lead.utmMedium ?? null,
-    utm_campaign: lead.utmCampaign ?? null,
-  });
-
-  if (answers.length) {
-    // submission_answers' RLS check needs to read quiz_submissions, which anon
-    // has no SELECT policy on (nested-RLS gap) — route this write through a
-    // server route holding the service-role key instead of inserting directly.
-    await fetch("/api/save-answers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ submissionId, answers }),
-    }).catch(() => {});
-  }
-
-  return leadId;
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error("שמירת הפרטים נכשלה. נסו שוב.");
+  return result.leadId as string;
 }
 
 export async function listAnalyticsEvents(supabase: SupabaseClient, quizId: string, sinceIso: string) {
@@ -481,12 +436,15 @@ export async function getQuestionDropoff(supabase: SupabaseClient, quizId: strin
 }
 
 export async function recordAnalyticsEvent(
-  supabase: SupabaseClient,
-  quizId: string,
-  eventType: "view" | "start" | "complete",
-  utmSource?: string
+  _supabase: SupabaseClient, _quizId: string, eventType: "view" | "start" | "complete",
+  utmSource?: string, session?: import("@/lib/public-session").PublicSession
 ) {
-  await supabase.from("analytics_events").insert({ quiz_id: quizId, event_type: eventType, utm_source: utmSource ?? null });
+  if (!session) return;
+  // Analytics must never interrupt quiz completion.
+  await fetch("/api/analytics", {
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.token },
+    body: JSON.stringify({ eventType, utmSource }),
+  }).catch(() => {});
 }
 
 // ---------------- Integrations ----------------

@@ -1,5 +1,7 @@
 "use client";
 
+import { csvCell } from "@/lib/safe-content";
+
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Download, Search, Loader2, Trash2 } from "lucide-react";
@@ -35,7 +37,7 @@ function exportCsv(leads: Lead[]) {
     l.utmContent ?? "",
     new Date(l.createdAt).toLocaleDateString("he-IL"),
   ]);
-  const csv = [header, ...rows].map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+  const csv = [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\n");
   const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

@@ -1,3 +1,4 @@
+import { sendSandboxTracking } from "@/lib/tracking-sandbox";
 import { QuizTrackingEvent, QuizTrackingSettings, TrackingCondition } from "@/lib/types";
 
 declare global {
@@ -38,37 +39,6 @@ function loadMetaPixelScript(pixelId: string) {
   window.fbq?.("init", pixelId);
 }
 
-export function injectGtm(containerId: string) {
-  if (typeof window === "undefined") return;
-  window._qfTrackingLoaded = window._qfTrackingLoaded || {};
-  if (window._qfTrackingLoaded.gtm === containerId) return;
-  window._qfTrackingLoaded.gtm = containerId;
-
-  window.dataLayer = window.dataLayer || [];
-  window.dataLayer.push({ "gtm.start": Date.now(), event: "gtm.js" });
-
-  const script = document.createElement("script");
-  script.async = true;
-  script.src = `https://www.googletagmanager.com/gtm.js?id=${containerId}`;
-  document.head.appendChild(script);
-
-  const noscript = document.createElement("noscript");
-  const iframe = document.createElement("iframe");
-  iframe.src = `https://www.googletagmanager.com/ns.html?id=${containerId}`;
-  iframe.height = "0";
-  iframe.width = "0";
-  iframe.style.display = "none";
-  iframe.style.visibility = "hidden";
-  noscript.appendChild(iframe);
-  document.body.appendChild(noscript);
-}
-
-function pushDataLayer(eventName: string, params: Record<string, unknown>) {
-  if (typeof window === "undefined") return;
-  window.dataLayer = window.dataLayer || [];
-  window.dataLayer.push({ event: "quizflow_conversion", quizflow_event_name: eventName, ...params });
-}
-
 function evaluateCondition(condition: TrackingCondition | undefined, context: Record<string, string | number | undefined>): boolean {
   if (!condition) return true;
   const actual = context[condition.field];
@@ -94,6 +64,7 @@ function evaluateCondition(condition: TrackingCondition | undefined, context: Re
 
 interface FireContext {
   sessionId: string;
+  sessionToken?: string;
   quizId: string;
   settings: QuizTrackingSettings;
   phone?: string;
@@ -119,24 +90,20 @@ export function fireTrackingEvent(def: QuizTrackingEvent, ctx: FireContext) {
   }
 
   if (def.sendToGtm && ctx.settings.gtmContainerId) {
-    injectGtm(ctx.settings.gtmContainerId);
-    pushDataLayer(eventName, { value: def.value, currency: def.currency, event_id: eventId });
+    sendSandboxTracking("gtm:" + ctx.quizId, { event: { event: "quizflow_conversion", quizflow_event_name: eventName, value: def.value, currency: def.currency, event_id: eventId } }, ctx.settings.gtmContainerId);
   }
 
   if (def.sendToCustomCode && def.customCode) {
-    try {
-      new Function(def.customCode)();
-    } catch (err) {
-      console.error("QuizFlow custom tracking code failed:", err);
-    }
+    sendSandboxTracking("custom:" + ctx.quizId, { code: def.customCode });
   }
 
-  if (def.sendToCapi && ctx.settings.metaHasToken) {
+  if (def.sendToCapi && ctx.settings.metaHasToken && ctx.sessionToken) {
     fetch("/api/tracking/fire-capi", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + ctx.sessionToken },
       body: JSON.stringify({
         quizId: ctx.quizId,
+        definitionId: def.id,
         eventName,
         eventId,
         value: def.value,

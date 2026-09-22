@@ -1,25 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireQuizOwner } from "@/lib/security/owner";
+import { securePost, uuid } from "@/lib/security/http";
 
-export async function POST(req: NextRequest) {
-  let body: { quizId?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "invalid JSON body" }, { status: 400 });
-  }
-  const { quizId } = body;
-  if (!quizId) return NextResponse.json({ ok: false, error: "missing quizId" }, { status: 400 });
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ ok: false, error: "not authenticated" }, { status: 401 });
-  const { data: quiz } = await supabase.from("quizzes").select("id").eq("id", quizId).maybeSingle();
-  if (!quiz) return NextResponse.json({ ok: false, error: "not found or not authorized" }, { status: 403 });
-
+export const POST = securePost(async (_req, body) => {
+  const quizId = uuid(body.quizId);
+  await requireQuizOwner(quizId);
   const admin = createAdminClient();
   const [{ data: settings }, { data: secret }] = await Promise.all([
     admin.from("quiz_tracking_settings").select("meta_pixel_id").eq("quiz_id", quizId).maybeSingle(),
@@ -30,7 +16,7 @@ export async function POST(req: NextRequest) {
   const token = secret?.meta_access_token;
   const now = new Date().toISOString();
 
-  if (!pixelId || !token) {
+  if (!pixelId || !/^\d{5,30}$/.test(pixelId) || !token) {
     await admin
       .from("quiz_tracking_settings")
       .upsert({ quiz_id: quizId, meta_last_test_status: "error", meta_last_test_error: "חסר Pixel ID או Access Token", meta_last_test_at: now });
@@ -40,6 +26,8 @@ export async function POST(req: NextRequest) {
   try {
     const res = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events`, {
       method: "POST",
+      redirect: "error",
+      signal: AbortSignal.timeout(8000),
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         access_token: token,
@@ -57,7 +45,7 @@ export async function POST(req: NextRequest) {
     const data = await res.json();
 
     if (!res.ok || data.error) {
-      const message = data.error?.message || `HTTP ${res.status}`;
+      const message = `Meta rejected the test (HTTP ${res.status})`;
       await admin
         .from("quiz_tracking_settings")
         .upsert({ quiz_id: quizId, meta_last_test_status: "error", meta_last_test_error: message, meta_last_test_at: now });
@@ -68,11 +56,11 @@ export async function POST(req: NextRequest) {
       .from("quiz_tracking_settings")
       .upsert({ quiz_id: quizId, meta_last_test_status: "success", meta_last_test_error: null, meta_last_test_at: now });
     return NextResponse.json({ ok: true });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "שגיאת רשת";
+  } catch {
+    const message = "שגיאת רשת";
     await admin
       .from("quiz_tracking_settings")
       .upsert({ quiz_id: quizId, meta_last_test_status: "error", meta_last_test_error: message, meta_last_test_at: now });
     return NextResponse.json({ ok: false, error: message });
   }
-}
+});

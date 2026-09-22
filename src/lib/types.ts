@@ -257,6 +257,7 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
 };
 
 export interface LeadAnswer {
+  optionIds?: string[];
   nodeId: string;
   questionTitle: string;
   answerLabel: string;
