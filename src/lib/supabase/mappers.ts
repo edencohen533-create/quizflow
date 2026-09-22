@@ -53,7 +53,8 @@ export interface QuizThemeRow {
   background_image_url: string | null;
   background_image_url_mobile: string | null;
   overlay: "none" | "light" | "dark";
-  font_family: "assistant" | "heebo";
+  font_family: "assistant" | "heebo" | "nunito";
+  font_size: number | null;
   button_style: "rounded" | "square" | "pill";
   card_position: "center" | "right" | "left";
   show_progress_bar: boolean;
@@ -94,6 +95,7 @@ export function themeRowToTheme(row: QuizThemeRow): QuizTheme {
     backgroundImageUrlMobile: row.background_image_url_mobile ?? undefined,
     overlay: row.overlay,
     fontFamily: row.font_family,
+    fontSize: row.font_size ?? undefined,
     buttonStyle: row.button_style,
     cardPosition: row.card_position,
     showProgressBar: row.show_progress_bar,
@@ -117,6 +119,7 @@ export function themeToRow(quizId: string, theme: QuizTheme): QuizThemeRow {
     background_image_url_mobile: theme.backgroundImageUrlMobile ?? null,
     overlay: theme.overlay,
     font_family: theme.fontFamily,
+    font_size: theme.fontSize ?? null,
     button_style: theme.buttonStyle,
     card_position: theme.cardPosition,
     show_progress_bar: theme.showProgressBar,

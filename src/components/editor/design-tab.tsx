@@ -4,11 +4,26 @@ import { useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { updateQuizTheme } from "@/lib/supabase/queries";
 import { Quiz, QuizTheme } from "@/lib/types";
 import { ImageUploadField } from "@/components/editor/image-upload-field";
 import { SunAvatar } from "@/components/runtime/sun-avatar";
+
+// Mirrors quiz-runner.tsx's FONT_FAMILY_VAR — same CSS variables next/font
+// exposes on <html> in layout.tsx.
+const FONT_FAMILY_VAR: Record<QuizTheme["fontFamily"], string> = {
+  assistant: "var(--font-assistant)",
+  heebo: "var(--font-heebo)",
+  nunito: "var(--font-nunito)",
+};
 
 // Mirrors quiz-runner.tsx's buildPalette() — keep the fallback colors in sync
 // if that function's defaults ever change.
@@ -23,8 +38,16 @@ function buildPreviewPalette(theme: QuizTheme) {
     text: theme.textColor || "#535C82",
     muted: theme.mutedTextColor || "#9AA0BE",
     radius: theme.cornerRadius ?? 22,
+    fontFamily: FONT_FAMILY_VAR[theme.fontFamily] ?? FONT_FAMILY_VAR.assistant,
+    fontSize: theme.fontSize ?? 16,
   };
 }
+
+const FONT_LABELS: Record<QuizTheme["fontFamily"], string> = {
+  assistant: "Assistant",
+  heebo: "Heebo",
+  nunito: "Nunito",
+};
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   const swatchValue = /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#000000";
@@ -139,6 +162,42 @@ export function DesignTab({ quiz, onThemeChange }: { quiz: Quiz; onThemeChange?:
         </Card>
 
         <Card>
+          <CardHeader><CardTitle className="text-base">טיפוגרפיה</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">גופן</Label>
+              <Select
+                value={theme.fontFamily}
+                onValueChange={(v) => v && patch({ fontFamily: v as QuizTheme["fontFamily"] })}
+                items={FONT_LABELS}
+              >
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(FONT_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground">גודל טקסט בסיסי</Label>
+                <span className="text-xs text-muted-foreground">{theme.fontSize ?? 16}px</span>
+              </div>
+              <input
+                type="range"
+                min={12}
+                max={20}
+                step={1}
+                value={theme.fontSize ?? 16}
+                onChange={(e) => patch({ fontSize: Number(e.target.value) })}
+                className="w-full"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader><CardTitle className="text-base">תמונת רקע</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs text-muted-foreground">אופציונלי. אם לא מועלית תמונה, ישמש &quot;רקע הצ&apos;אט&quot; שהוגדר למעלה.</p>
@@ -168,7 +227,11 @@ export function DesignTab({ quiz, onThemeChange }: { quiz: Quiz; onThemeChange?:
 
       <div className="lg:sticky lg:top-6 h-fit">
         <p className="text-xs text-muted-foreground mb-2">כך נראה השאלון החי</p>
-        <div dir="rtl" className="rounded-2xl border overflow-hidden aspect-[9/16] overflow-y-auto" style={{ background: previewBg }}>
+        <div
+          dir="rtl"
+          className="rounded-2xl border overflow-hidden aspect-[9/16] overflow-y-auto"
+          style={{ background: previewBg, fontFamily: palette.fontFamily, fontSize: palette.fontSize }}
+        >
           <div className="p-4 space-y-4">
             <div className="flex justify-start">
               <div className="flex max-w-[85%] flex-col items-end gap-1">

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ArrowLeft } from "lucide-react";
 import { Quiz, QuizNode, QuizTheme, LeadAnswer } from "@/lib/types";
 import { getStartNode, resolveRenderable, isValidIsraeliPhone } from "@/lib/quiz-runtime";
 import { createClient } from "@/lib/supabase/client";
@@ -17,6 +17,15 @@ import { renderRichText } from "@/lib/rich-text";
 
 type Palette = ReturnType<typeof buildPalette>;
 
+// Matches the CSS variables next/font exposes on <html> in layout.tsx —
+// all three are loaded globally so a quiz can switch fonts without a
+// per-request dynamic load.
+const FONT_FAMILY_VAR: Record<QuizTheme["fontFamily"], string> = {
+  assistant: "var(--font-assistant)",
+  heebo: "var(--font-heebo)",
+  nunito: "var(--font-nunito)",
+};
+
 function buildPalette(theme: QuizTheme) {
   const accent = theme.primaryColor || "#EE746C";
   return {
@@ -28,6 +37,8 @@ function buildPalette(theme: QuizTheme) {
     text: theme.textColor || "#535C82",
     muted: theme.mutedTextColor || "#9AA0BE",
     radius: theme.cornerRadius ?? 22,
+    fontFamily: FONT_FAMILY_VAR[theme.fontFamily] ?? FONT_FAMILY_VAR.assistant,
+    fontSize: theme.fontSize ?? 16,
   };
 }
 
@@ -360,7 +371,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   }
 
   return (
-    <div dir="rtl" className="qf-runner-bg min-h-screen">
+    <div dir="rtl" className="qf-runner-bg min-h-screen" style={{ fontFamily: PALETTE.fontFamily, fontSize: PALETTE.fontSize }}>
       <style>{`.qf-runner-bg{background:${desktopBg};}@media (max-width:767px){.qf-runner-bg{background:${mobileBg};}}`}</style>
       <div className="mx-auto max-w-2xl px-4 pb-32 pt-6 sm:px-6">
         <div className="space-y-5">
@@ -448,10 +459,11 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
                   {isActive && history.length > 1 && (
                     <button
                       onClick={goBack}
-                      className="px-1 text-xs underline underline-offset-2"
-                      style={{ color: PALETTE.muted }}
+                      className="mt-3 flex items-center gap-1.5 rounded-full bg-black/5 px-4 py-2 text-xs font-medium"
+                      style={{ color: PALETTE.text }}
                     >
-                      ‹ חזרה לשאלה הקודמת
+                      חזרה
+                      <ArrowLeft className="size-3.5" />
                     </button>
                   )}
                 </div>

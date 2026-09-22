@@ -74,7 +74,8 @@ create table if not exists public.quiz_themes (
   background_image_url text,
   background_image_url_mobile text,
   overlay text not null default 'none' check (overlay in ('none', 'light', 'dark')),
-  font_family text not null default 'assistant' check (font_family in ('assistant', 'heebo')),
+  font_family text not null default 'assistant' check (font_family in ('assistant', 'heebo', 'nunito')),
+  font_size integer,
   button_style text not null default 'pill' check (button_style in ('rounded', 'square', 'pill')),
   card_position text not null default 'center' check (card_position in ('center', 'right', 'left')),
   show_progress_bar boolean not null default true,
@@ -934,3 +935,12 @@ alter table public.quiz_themes add column if not exists button_text_color text;
 -- ============================================================
 
 alter table public.quiz_themes add column if not exists corner_radius integer;
+
+-- ============================================================
+-- 20. Nunito as a selectable font, plus a base font-size option, added to
+--     an already-deployed quiz_themes table.
+-- ============================================================
+
+alter table public.quiz_themes drop constraint if exists quiz_themes_font_family_check;
+alter table public.quiz_themes add constraint quiz_themes_font_family_check check (font_family in ('assistant', 'heebo', 'nunito'));
+alter table public.quiz_themes add column if not exists font_size integer;
