@@ -22,6 +22,7 @@ function buildPreviewPalette(theme: QuizTheme) {
     buttonText: theme.buttonTextColor || accent,
     text: theme.textColor || "#535C82",
     muted: theme.mutedTextColor || "#9AA0BE",
+    radius: theme.cornerRadius ?? 22,
   };
 }
 
@@ -131,6 +132,29 @@ export function DesignTab({ quiz, onThemeChange }: { quiz: Quiz; onThemeChange?:
         </Card>
 
         <Card>
+          <CardHeader><CardTitle className="text-base">צורת הבלוקים</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">רמת פינות מעוגלות (בורדר רדיוס)</Label>
+              <span className="text-xs text-muted-foreground">{theme.cornerRadius ?? 22}px</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={32}
+              step={2}
+              value={theme.cornerRadius ?? 22}
+              onChange={(e) => patch({ cornerRadius: Number(e.target.value) })}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>מרובע</span>
+              <span>עגול</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader><CardTitle className="text-base">תמונת רקע</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs text-muted-foreground">אופציונלי. אם לא מועלית תמונה, ישמש &quot;רקע הצ&apos;אט&quot; שהוגדר למעלה.</p>
@@ -162,7 +186,7 @@ export function DesignTab({ quiz, onThemeChange }: { quiz: Quiz; onThemeChange?:
         <p className="text-xs text-muted-foreground mb-2">כך נראה השאלון החי</p>
         <div dir="rtl" className="rounded-2xl border overflow-hidden aspect-[9/16] overflow-y-auto" style={{ background: previewBg }}>
           <div className="p-4 space-y-4">
-            <div className="flex items-center justify-center rounded-[20px] bg-white py-5 shadow-sm">
+            <div className="flex items-center justify-center bg-white py-5 shadow-sm" style={{ borderRadius: palette.radius + 6 }}>
               {theme.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={theme.logoUrl} alt="" className="h-10 object-contain" />
@@ -174,8 +198,8 @@ export function DesignTab({ quiz, onThemeChange }: { quiz: Quiz; onThemeChange?:
             <div className="flex flex-col items-end gap-1">
               <div className="flex items-end gap-2">
                 <div
-                  className="max-w-[85%] rounded-[22px] px-4 py-3 text-sm leading-relaxed"
-                  style={{ background: palette.bubbleBot, color: palette.text }}
+                  className="max-w-[85%] px-4 py-3 text-sm leading-relaxed"
+                  style={{ background: palette.bubbleBot, color: palette.text, borderRadius: palette.radius }}
                 >
                   <p className="font-bold">מהו גילך?</p>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -201,8 +225,8 @@ export function DesignTab({ quiz, onThemeChange }: { quiz: Quiz; onThemeChange?:
 
             <div className="flex flex-col items-start gap-1">
               <div
-                className="max-w-[75%] rounded-[20px] px-4 py-2.5 text-sm leading-relaxed"
-                style={{ background: palette.bubbleUser, color: palette.text }}
+                className="max-w-[75%] px-4 py-2.5 text-sm leading-relaxed"
+                style={{ background: palette.bubbleUser, color: palette.text, borderRadius: Math.max(0, palette.radius - 2) }}
               >
                 31–45
               </div>

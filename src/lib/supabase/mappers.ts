@@ -60,6 +60,7 @@ export interface QuizThemeRow {
   show_progress_bar: boolean;
   show_question_number: boolean;
   custom_css: string | null;
+  corner_radius: number | null;
 }
 
 export interface LeadRow {
@@ -100,6 +101,7 @@ export function themeRowToTheme(row: QuizThemeRow): QuizTheme {
     showProgressBar: row.show_progress_bar,
     showQuestionNumber: row.show_question_number,
     customCss: row.custom_css ?? undefined,
+    cornerRadius: row.corner_radius ?? undefined,
   };
 }
 
@@ -123,6 +125,7 @@ export function themeToRow(quizId: string, theme: QuizTheme): QuizThemeRow {
     show_progress_bar: theme.showProgressBar,
     show_question_number: theme.showQuestionNumber,
     custom_css: theme.customCss ?? null,
+    corner_radius: theme.cornerRadius ?? null,
   };
 }
 

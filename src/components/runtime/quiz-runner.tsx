@@ -27,6 +27,7 @@ function buildPalette(theme: QuizTheme) {
     buttonText: theme.buttonTextColor || accent,
     text: theme.textColor || "#535C82",
     muted: theme.mutedTextColor || "#9AA0BE",
+    radius: theme.cornerRadius ?? 22,
   };
 }
 
@@ -363,7 +364,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
       <style>{`.qf-runner-bg{background:${desktopBg};}@media (max-width:767px){.qf-runner-bg{background:${mobileBg};}}`}</style>
       <div className="mx-auto max-w-2xl px-4 pb-32 pt-6 sm:px-6">
         {quiz.theme.logoUrl && (
-          <div className="mb-8 flex items-center justify-center rounded-[28px] bg-white px-8 py-10 shadow-sm">
+          <div className="mb-8 flex items-center justify-center bg-white px-8 py-10 shadow-sm" style={{ borderRadius: PALETTE.radius + 6 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={quiz.theme.logoUrl} alt={quiz.name} className="h-24 max-w-full object-contain" />
           </div>
@@ -376,8 +377,8 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
                 <div key={entry.id} className="flex justify-end">
                   <div className="flex max-w-[75%] flex-col items-end gap-1">
                     <div
-                      className="rounded-[20px] px-5 py-3 leading-relaxed"
-                      style={{ background: PALETTE.bubbleUser, color: PALETTE.text }}
+                      className="px-5 py-3 leading-relaxed"
+                      style={{ background: PALETTE.bubbleUser, color: PALETTE.text, borderRadius: Math.max(0, PALETTE.radius - 2) }}
                     >
                       {entry.text}
                     </div>
@@ -391,7 +392,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
               return (
                 <div key={entry.id} className="flex items-end justify-start gap-2">
                   <Avatar url={quiz.theme.avatarUrl} />
-                  <div className="flex items-center gap-1.5 rounded-[22px] bg-white px-5 py-4" style={{ background: PALETTE.bubbleBot }}>
+                  <div className="flex items-center gap-1.5 bg-white px-5 py-4" style={{ background: PALETTE.bubbleBot, borderRadius: PALETTE.radius }}>
                     <span className="size-2 animate-bounce rounded-full bg-current" style={{ color: PALETTE.muted }} />
                     <span className="size-2 animate-bounce rounded-full bg-current [animation-delay:0.15s]" style={{ color: PALETTE.muted }} />
                     <span className="size-2 animate-bounce rounded-full bg-current [animation-delay:0.3s]" style={{ color: PALETTE.muted }} />
@@ -416,8 +417,8 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
                   <div className="flex items-end gap-2">
                     <Avatar url={quiz.theme.avatarUrl} />
                     <div
-                      className="max-w-[85%] rounded-[22px] px-5 py-4 leading-relaxed"
-                      style={{ background: PALETTE.bubbleBot, color: PALETTE.text }}
+                      className="max-w-[85%] px-5 py-4 leading-relaxed"
+                      style={{ background: PALETTE.bubbleBot, color: PALETTE.text, borderRadius: PALETTE.radius }}
                     >
                       <BotNodeContent node={node} params={paramValues} />
                       {isActive && (
@@ -798,8 +799,8 @@ function ResultCard({
   return (
     <div className="flex justify-start">
       <div
-        className="max-w-[92%] rounded-[24px] border-2 bg-white p-6 text-center shadow-md sm:max-w-[85%]"
-        style={{ borderColor: PALETTE.buttonBorder, color: PALETTE.text }}
+        className="max-w-[92%] border-2 bg-white p-6 text-center shadow-md sm:max-w-[85%]"
+        style={{ borderColor: PALETTE.buttonBorder, color: PALETTE.text, borderRadius: PALETTE.radius + 2 }}
       >
         <div className="mb-3 flex justify-center">
           <Avatar url={avatarUrl} size={48} />

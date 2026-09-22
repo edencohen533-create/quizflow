@@ -79,7 +79,8 @@ create table if not exists public.quiz_themes (
   card_position text not null default 'center' check (card_position in ('center', 'right', 'left')),
   show_progress_bar boolean not null default true,
   show_question_number boolean not null default true,
-  custom_css text
+  custom_css text,
+  corner_radius integer
 );
 
 -- ============================================================
@@ -925,3 +926,11 @@ alter table public.integrations add column if not exists extra_params jsonb not 
 
 alter table public.quiz_themes add column if not exists button_border_color text;
 alter table public.quiz_themes add column if not exists button_text_color text;
+
+-- ============================================================
+-- 19. Configurable corner radius for message/answer bubbles and cards in
+--     the live runner, added to an already-deployed quiz_themes table.
+--     Null falls back to the current fixed look (see buildPalette()).
+-- ============================================================
+
+alter table public.quiz_themes add column if not exists corner_radius integer;
