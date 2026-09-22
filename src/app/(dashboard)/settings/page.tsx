@@ -21,9 +21,14 @@ export default function SettingsPage() {
   const [workspaceName, setWorkspaceName] = useState("");
 
   const load = useCallback(async () => {
+    // getSession() reads the already-verified JWT locally — the proxy
+    // already revalidated it server-side before this page rendered, so
+    // getUser() here would just be a redundant network round trip for a
+    // read-only display of the current name/email.
     const {
-      data: { user },
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
+    const user = session?.user;
     if (!user) return;
     setEmail(user.email ?? "");
     setFullName((user.user_metadata?.full_name as string | undefined) ?? "");

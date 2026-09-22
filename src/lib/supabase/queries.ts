@@ -36,23 +36,40 @@ function slugify(name: string) {
   );
 }
 
-export async function getWorkspaceId(supabase: SupabaseClient): Promise<string> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("לא מחובר");
-
-  const { data, error } = await supabase.from("workspaces").select("id").eq("owner_id", user.id).limit(1).maybeSingle();
+async function findOrCreateWorkspace(supabase: SupabaseClient, userId: string): Promise<string> {
+  const { data, error } = await supabase.from("workspaces").select("id").eq("owner_id", userId).limit(1).maybeSingle();
   if (error) throw error;
   if (data) return data.id;
 
   const { data: created, error: createError } = await supabase
     .from("workspaces")
-    .insert({ owner_id: user.id, name: "workspace ראשי" })
+    .insert({ owner_id: userId, name: "workspace ראשי" })
     .select("id")
     .single();
   if (createError) throw createError;
   return created.id;
+}
+
+export async function getWorkspaceId(supabase: SupabaseClient): Promise<string> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("לא מחובר");
+  return findOrCreateWorkspace(supabase, user.id);
+}
+
+// Client-only variant for WorkspaceProvider: the proxy (src/proxy.ts) already
+// revalidates the session server-side with getUser() before any dashboard
+// page renders, so doing that again here on every navigation just adds a
+// redundant network round trip. getSession() reads the already-verified
+// JWT locally instead — safe specifically because the server-side check
+// already happened upstream of this ever running.
+export async function getWorkspaceIdForUser(supabase: SupabaseClient): Promise<string> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("לא מחובר");
+  return findOrCreateWorkspace(supabase, session.user.id);
 }
 
 export async function listQuizzes(supabase: SupabaseClient, workspaceId: string): Promise<Quiz[]> {

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { getWorkspaceId } from "@/lib/supabase/queries";
+import { getWorkspaceIdForUser } from "@/lib/supabase/queries";
 
 // Every dashboard page independently called getWorkspaceId() on mount, each
 // paying for an auth check + a workspaces query on every navigation even
@@ -22,7 +22,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    getWorkspaceId(supabase).then((id) => {
+    getWorkspaceIdForUser(supabase).then((id) => {
       if (!cancelled) setWorkspaceId(id);
     });
     return () => {
