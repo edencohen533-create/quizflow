@@ -218,7 +218,7 @@ function MessageForm({ data, onChange, availableParams }: { data: MessageNodeDat
         <ParamChips params={availableParams} onInsert={(token) => onChange({ ...data, text: appendToken(data.text, token) })} />
       </Field>
       <Field label="תמונה (אופציונלי)">
-        <ImageUploadField value={data.imageUrl ?? ""} onChange={(url) => onChange({ ...data, imageUrl: url })} />
+        <ImageUploadField value={data.imageUrl ?? ""} onChange={(url) => onChange({ ...data, imageUrl: url })} autoTrim />
       </Field>
       <Field label="קישור לוידאו (אופציונלי)">
         <Input value={data.videoUrl ?? ""} onChange={(e) => onChange({ ...data, videoUrl: e.target.value })} placeholder="https://" />
@@ -289,7 +289,7 @@ function QuestionContentBlocks({ data, onChange, availableParams }: { data: Ques
             )}
           </div>
           {block === "image" ? (
-            <ImageUploadField value={data.imageUrl ?? ""} onChange={(url) => onChange({ ...data, imageUrl: url })} />
+            <ImageUploadField value={data.imageUrl ?? ""} onChange={(url) => onChange({ ...data, imageUrl: url })} autoTrim />
           ) : (
             <>
               <Textarea

@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { uploadQuizImage } from "@/lib/supabase/storage";
+import { trimImagePadding } from "@/lib/trim-image";
 
 export function ImageUploadField({
   value,
@@ -13,12 +14,16 @@ export function ImageUploadField({
   previewClassName = "h-28 w-full object-cover",
   uploadLabel = "העלה תמונה",
   replaceLabel = "החלף תמונה",
+  autoTrim = false,
 }: {
   value: string;
   onChange: (url: string) => void;
   previewClassName?: string;
   uploadLabel?: string;
   replaceLabel?: string;
+  // crops away blank/transparent padding baked into the file — for
+  // logo-style images shown in their own card, not for backgrounds/photos
+  autoTrim?: boolean;
 }) {
   const supabase = useMemo(() => createClient(), []);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -27,7 +32,8 @@ export function ImageUploadField({
   async function handleFile(file: File) {
     setUploading(true);
     try {
-      const url = await uploadQuizImage(supabase, file);
+      const uploadFile = autoTrim ? await trimImagePadding(file) : file;
+      const url = await uploadQuizImage(supabase, uploadFile);
       onChange(url);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "העלאת התמונה נכשלה");
