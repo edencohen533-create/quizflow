@@ -14,17 +14,9 @@ import { QuizTrackingEvent, QuizTrackingSettings, QuizSessionAnswer } from "@/li
 import { Checkbox } from "@/components/ui/checkbox";
 import { SunAvatar } from "@/components/runtime/sun-avatar";
 import { renderRichText } from "@/lib/rich-text";
+import { FONT_FAMILY_CSS } from "@/lib/quiz-fonts";
 
 type Palette = ReturnType<typeof buildPalette>;
-
-// Matches the CSS variables next/font exposes on <html> in layout.tsx —
-// all three are loaded globally so a quiz can switch fonts without a
-// per-request dynamic load.
-const FONT_FAMILY_VAR: Record<QuizTheme["fontFamily"], string> = {
-  assistant: "var(--font-assistant)",
-  heebo: "var(--font-heebo)",
-  nunito: "var(--font-nunito)",
-};
 
 function buildPalette(theme: QuizTheme) {
   const accent = theme.primaryColor || "#EE746C";
@@ -37,7 +29,7 @@ function buildPalette(theme: QuizTheme) {
     text: theme.textColor || "#535C82",
     muted: theme.mutedTextColor || "#9AA0BE",
     radius: theme.cornerRadius ?? 22,
-    fontFamily: FONT_FAMILY_VAR[theme.fontFamily] ?? FONT_FAMILY_VAR.assistant,
+    fontFamily: FONT_FAMILY_CSS[theme.fontFamily] ?? FONT_FAMILY_CSS.assistant,
     fontSize: theme.fontSize ?? 16,
   };
 }

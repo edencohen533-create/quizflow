@@ -40,11 +40,16 @@ export function AppSidebar() {
     setDark(isDark);
     document.documentElement.classList.toggle("dark", isDark);
 
+    // getSession() reads the already-verified JWT locally — the proxy
+    // (src/proxy.ts) already revalidated it server-side with getUser()
+    // before this dashboard page rendered at all, so doing that again here
+    // just for a display name/email would be a redundant network round trip.
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) return;
-      const name = (data.user.user_metadata?.full_name as string | undefined) || data.user.email || "";
-      setUserLabel({ name, email: data.user.email ?? "" });
+    supabase.auth.getSession().then(({ data }) => {
+      const user = data.session?.user;
+      if (!user) return;
+      const name = (user.user_metadata?.full_name as string | undefined) || user.email || "";
+      setUserLabel({ name, email: user.email ?? "" });
     });
   }, []);
 

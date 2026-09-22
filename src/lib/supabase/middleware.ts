@@ -1,9 +1,20 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PREFIXES = ["/login", "/auth", "/q/", "/api/", "/embed.js"];
+// Prefixes that never need to know who's signed in — no redirect on this
+// proxy ever depends on auth state for them (the public quiz runner, its
+// APIs, the embed script). getUser() revalidates against Supabase's auth
+// server on every call, so skipping it here removes a network round trip
+// from the hottest, most latency-sensitive path: every anonymous visitor's
+// quiz page load and every tracking/webhook API call.
+const ALWAYS_PUBLIC_PREFIXES = ["/q/", "/api/", "/embed.js", "/auth"];
 
 export async function updateSession(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  if (ALWAYS_PUBLIC_PREFIXES.some((p) => path.startsWith(p))) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -23,20 +34,21 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
+  // /login is the only remaining "public" path — still needs user state to
+  // redirect an already-signed-in visitor away from it.
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const path = request.nextUrl.pathname;
-  const isPublic = PUBLIC_PREFIXES.some((p) => path.startsWith(p));
+  const isLogin = path.startsWith("/login");
 
-  if (!user && !isPublic) {
+  if (!user && !isLogin) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && path.startsWith("/login")) {
+  if (user && isLogin) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);

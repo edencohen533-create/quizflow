@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { fetchQuizFullBySlug } from "@/lib/supabase/queries";
 import { QuizRunner } from "@/components/runtime/quiz-runner";
+import { GOOGLE_FONT_STYLESHEET } from "@/lib/quiz-fonts";
 
 export default async function PublicQuizPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug: rawSlug } = await params;
@@ -20,8 +21,11 @@ export default async function PublicQuizPage({ params }: { params: Promise<{ slu
     );
   }
 
+  const fontHref = GOOGLE_FONT_STYLESHEET[quiz.theme.fontFamily];
+
   return (
     <Suspense>
+      {fontHref && <link rel="stylesheet" href={fontHref} />}
       <QuizRunner quiz={quiz} />
     </Suspense>
   );
