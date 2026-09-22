@@ -481,22 +481,26 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   );
 }
 
+// Image-led welcome cards keep the short greeting with the first paragraph.
+// Other authored line breaks are preserved.
+function formatImageIntro(text: string, imageUrl?: string): string {
+  return imageUrl
+    ? text.replace(/^(היי|הי|שלום)([^\n]*)\n(?:[ \t]*\n)+/u, "$1$2\n")
+    : text;
+}
+
 function BotNodeContent({ node, params }: { node: QuizNode; params: Record<string, string> }) {
   if (node.data.kind === "message") {
     // the image (if any) renders as its own separate floating card above
     // this bubble — see the "bot" entry case in the main render.
     const text = interpolateParams(node.data.text, params);
-    // Keep an introductory greeting with its paragraph, as in the welcome
-    // card design. Preserve all other authored paragraph and line breaks.
-    const displayText = node.data.imageUrl
-      ? text.replace(/^(היי|הי|שלום)([^\n]*)\n(?:[ \t]*\n)+/u, "$1$2\n")
-      : text;
+    const displayText = formatImageIntro(text, node.data.imageUrl);
     return <p className="whitespace-pre-line">{renderRichText(displayText)}</p>;
   }
   if (node.data.kind === "question") {
     // the image (if any) renders as its own separate floating card, above
     // or below this bubble per imagePosition — see the "bot" entry case.
-    return <p className="whitespace-pre-line">{renderRichText(interpolateParams(node.data.title, params))}</p>;
+    return <p className="whitespace-pre-line">{renderRichText(formatImageIntro(interpolateParams(node.data.title, params), node.data.imageUrl))}</p>;
   }
   if (node.data.kind === "name") {
     return <p>{node.data.title}</p>;
