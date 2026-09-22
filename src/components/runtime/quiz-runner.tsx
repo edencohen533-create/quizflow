@@ -411,9 +411,17 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
             if (!node) return null;
             const isActive = entry.nodeId === activeNodeId;
 
+            const messageImageUrl = node.data.kind === "message" ? node.data.imageUrl : undefined;
+
             return (
               <div key={entry.id} className="flex justify-start">
                 <div ref={isActive ? activeNodeRef : undefined} className="flex max-w-[85%] flex-col items-end gap-1">
+                  {messageImageUrl && (
+                    <div className="mb-3 w-full bg-white p-4 shadow-sm" style={{ borderRadius: PALETTE.radius }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={messageImageUrl} alt="" className="max-h-56 w-full object-contain" />
+                    </div>
+                  )}
                   <div className="flex min-w-0 items-end gap-2">
                     <Avatar url={quiz.theme.avatarUrl} />
                     <div
@@ -466,15 +474,9 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
 
 function BotNodeContent({ node, params }: { node: QuizNode; params: Record<string, string> }) {
   if (node.data.kind === "message") {
-    return (
-      <div className="space-y-3">
-        {node.data.imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={node.data.imageUrl} alt="" className="w-full rounded-xl object-cover" />
-        )}
-        <p className="whitespace-pre-line">{renderRichText(interpolateParams(node.data.text, params))}</p>
-      </div>
-    );
+    // the image (if any) renders as its own separate floating card above
+    // this bubble — see the "bot" entry case in the main render.
+    return <p className="whitespace-pre-line">{renderRichText(interpolateParams(node.data.text, params))}</p>;
   }
   if (node.data.kind === "question") {
     const image = node.data.imageUrl && (
