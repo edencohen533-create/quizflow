@@ -41,5 +41,5 @@ export function resolveRenderable(quiz: Quiz, fromId: string, handle: string | n
     const nextHandle = node.type === "ab_test" ? pickAbTestHandle(node) : null;
     node = nextNodeFrom(quiz, node.id, nextHandle);
   }
-  return node;
+  return node && !AUTO_ADVANCE_TYPES.has(node.type) ? node : undefined;
 }

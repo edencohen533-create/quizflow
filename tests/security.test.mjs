@@ -378,3 +378,22 @@ test("concurrent flow saves are serialized and a failed save does not poison the
   await second;
   assert.equal(writes, 2);
 });
+
+test("automatic flow cycles resolve to no target instead of an unusable condition node", () => {
+  const runtime = loader()("src/lib/quiz-runtime.ts");
+  const cyclic = { nodes: [{ id: "start", type: "start", data: { kind: "start" } }, { id: "loop", type: "condition", data: { kind: "condition", rules: [] } }], edges: [{ source: "start", target: "loop" }, { source: "loop", target: "loop" }] };
+  assert.equal(runtime.resolveRenderable(cyclic, "start"), undefined);
+});
+test("submission client surfaces transport/server failures instead of claiming success", async () => {
+  const queries = loader()("src/lib/supabase/queries.ts");
+  const original = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response(JSON.stringify({ ok: false }), { status: 503 });
+    await assert.rejects(queries.submitPublicQuizResponse({}, quiz, { name: "QA" }, [], publicSession), /שמירת/);
+    globalThis.fetch = async (_url, options) => {
+      assert.equal(options.headers.Authorization, "Bearer " + publicSession.token);
+      return new Response(JSON.stringify({ ok: true, leadId: claims.leadId }));
+    };
+    assert.equal(await queries.submitPublicQuizResponse({}, quiz, { name: "QA" }, [], publicSession), claims.leadId);
+  } finally { globalThis.fetch = original; }
+});

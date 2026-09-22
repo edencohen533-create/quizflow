@@ -117,6 +117,7 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
   const startedRef = useRef(false);
   const submittedRef = useRef(false);
   const advancingRef = useRef(false);
+  const [submissionState, setSubmissionState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const retryRef = useRef<(() => void) | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -234,7 +235,7 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
         firedPageLoadRef.current = true;
         fireEventsForTrigger(null);
       }
-    })();
+    })().catch(() => {});
     if (firstNode && firstNode.type !== "end") {
       pushSessionUpdate(firstNode, 0, "active", {}, 0);
     }
@@ -281,21 +282,22 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
   }
 
   async function submitLead(finalAnswers: Record<string, LeadAnswer>, finalScore: number) {
-    if (submittedRef.current) return;
+    if (submittedRef.current || !session) return;
     submittedRef.current = true;
-    if (!session) return;
     setSubmissionError(null);
+    setSubmissionState("saving");
     retryRef.current = () => { void submitLead(finalAnswers, finalScore); };
     try {
+    const lead = leadInfoRef.current;
     const category = finalScore >= 26 ? "hot" : finalScore >= 16 ? "warm" : "cold";
     const leadId = await submitPublicQuizResponse(
       supabase,
       quiz,
       {
-        name: leadInfo.name || "ללא שם",
-        phone: leadInfo.phone,
-        email: leadInfo.email,
-        consent: leadInfo.consent,
+        name: lead.name || "ללא שם",
+        phone: lead.phone,
+        email: lead.email,
+        consent: lead.consent,
         score: finalScore,
         category,
         utmSource,
@@ -308,8 +310,10 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
     );
     recordAnalyticsEvent(supabase, quiz.id, "complete", utmSource, session);
     triggerIntegrations(leadId, session.token);
+    setSubmissionState("saved");
     } catch {
       submittedRef.current = false;
+      setSubmissionState("failed");
       setSubmissionError("לא הצלחנו לשמור את הפרטים. לחצו כדי לנסות שוב.");
     }
   }
@@ -338,7 +342,7 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
         return [...withoutTyping, { id: uid(), kind: "bot", nodeId: next.id, ts: Date.now() }];
       });
       if (next.type === "end") {
-        if (leadInfo.phone || leadInfo.email || leadInfo.name) submitLead(mergedAnswers, mergedScore);
+        if (leadInfoRef.current.phone || leadInfoRef.current.email || leadInfoRef.current.name) void submitLead(mergedAnswers, mergedScore);
       } else {
         setActiveNodeId(next.id);
         setHistory((h) => [...h, next.id]);
@@ -389,6 +393,7 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
     <div dir="rtl" className="qf-runner-bg min-h-screen" style={{ fontFamily: PALETTE.fontFamily, fontSize: PALETTE.fontSize, fontWeight: 500 }}>
       <style>{`.qf-runner-bg{background:${desktopBg};}@media (max-width:767px){.qf-runner-bg{background:${mobileBg};}}`}</style>
       <div className="mx-auto max-w-[680px] px-4 pb-24 pt-6 sm:px-6 sm:pt-10">
+        {submissionState === "saving" && <p role="status" className="mb-4 text-center">שומרים את הפרטים...</p>}
         {submissionError && <div role="alert" className="mb-4 rounded-lg bg-white p-4 text-red-700">{submissionError}<button className="mx-2 underline" onClick={() => retryRef.current?.()}>נסו שוב</button></div>}
         <div className="space-y-5">
           {entries.map((entry) => {
@@ -423,7 +428,7 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
             if (entry.kind === "result") {
               const node = nodesById.get(entry.nodeId);
               if (!node || node.data.kind !== "end") return null;
-              return <ResultCard key={entry.id} data={node.data} palette={PALETTE} avatarUrl={quiz.theme.avatarUrl} params={paramValues} />;
+              return <ResultCard key={entry.id} canRedirect={submissionState === "idle" || submissionState === "saved"} data={node.data} palette={PALETTE} avatarUrl={quiz.theme.avatarUrl} params={paramValues} />;
             }
 
             const node = nodesById.get(entry.nodeId);
@@ -464,7 +469,10 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
                   node={node}
                   palette={PALETTE}
                   leadInfo={leadInfo}
-                  onLeadInfoChange={(patch) => setLeadInfo((s) => ({ ...s, ...patch }))}
+                  onLeadInfoChange={(patch) => {
+                    leadInfoRef.current = { ...leadInfoRef.current, ...patch };
+                    setLeadInfo(leadInfoRef.current);
+                  }}
                   onComplete={(text, handle, answer) => handleComplete(node, text, handle, answer)}
                 />
               </div>
@@ -475,7 +483,7 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
                 <div ref={isActive ? activeNodeRef : undefined} className="flex w-full min-w-0 flex-col items-end">
                   {imageBelow ? [bubbleRow, imageCard] : [imageCard, bubbleRow]}
                   {controlsRow}
-                  {isActive && history.length > 1 && (
+                  {isActive && quiz.allowBack && history.length > 1 && (
                     <button
                       onClick={goBack}
                       className="mt-3 flex w-fit items-center gap-1.5 self-start rounded-full bg-black/5 px-4 py-2 text-xs font-medium"
@@ -751,6 +759,10 @@ function NodeControls({
     const data = node.data;
 
     function handleSubmit() {
+      if (data.showEmail && leadInfo.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadInfo.email)) {
+        setError("כתובת אימייל לא תקינה");
+        return;
+      }
       if (data.showPhone && data.requirePhoneIL && !isValidIsraeliPhone(leadInfo.phone)) {
         setError("מספר טלפון לא תקין");
         return;
@@ -768,6 +780,7 @@ function NodeControls({
         {data.showName && (
           <input
             placeholder="שם מלא"
+            maxLength={200}
             value={leadInfo.name}
             onChange={(e) => onLeadInfoChange({ name: e.target.value })}
             className="w-full rounded-lg border px-4 py-2.5 text-sm outline-none focus:ring-2"
@@ -777,6 +790,8 @@ function NodeControls({
         {data.showPhone && (
           <input
             placeholder="טלפון"
+            type="tel"
+            maxLength={40}
             dir="ltr"
             value={leadInfo.phone}
             onChange={(e) => onLeadInfoChange({ phone: e.target.value })}
@@ -787,6 +802,8 @@ function NodeControls({
         {data.showEmail && (
           <input
             placeholder="אימייל"
+            type="email"
+            maxLength={254}
             dir="ltr"
             value={leadInfo.email}
             onChange={(e) => onLeadInfoChange({ email: e.target.value })}
@@ -812,11 +829,13 @@ function NodeControls({
 }
 
 function ResultCard({
+  canRedirect,
   data,
   palette,
   avatarUrl,
   params,
 }: {
+  canRedirect: boolean;
   data: Extract<QuizNode["data"], { kind: "end" }>;
   palette: Palette;
   avatarUrl?: string;
@@ -825,8 +844,8 @@ function ResultCard({
   const PALETTE = palette;
   const redirectUrl = safeLink(data.redirectUrl);
   const ctaUrl = safeLink(data.ctaUrl);
-  const shouldRedirect = !!(data.redirectEnabled && redirectUrl);
-  const [secondsLeft, setSecondsLeft] = useState(data.redirectDelaySeconds ?? 3);
+  const shouldRedirect = !!(canRedirect && data.redirectEnabled && redirectUrl);
+  const [secondsLeft, setSecondsLeft] = useState(Math.min(300, Math.max(0, data.redirectDelaySeconds ?? 3)));
 
   useEffect(() => {
     if (!shouldRedirect) return;
