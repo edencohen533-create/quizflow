@@ -60,6 +60,7 @@ function Avatar({ url, size = 34 }: { url?: string; size?: number }) {
       // eslint-disable-next-line @next/next/no-img-element
       <img
         {...imageProps}
+        alt=""
         className="shrink-0 rounded-full bg-white object-contain"
         style={{ width: size, height: size }}
       />
