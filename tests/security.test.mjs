@@ -422,3 +422,16 @@ test("submission path ignores disconnected contact requirements and rejects skip
  assert.equal(submissionPath(disconnected,valid,"session").some(n=>n.id==="orphan"),false);
  assert.throws(()=>submissionPath(disconnected,[],"session"),/Required answer/);
 });
+
+test("Meta delivery requires a positive provider acknowledgement, not just HTTP 200",async()=>{
+ const original=globalThis.fetch;
+ try {
+  for(const [body,expected] of [[{events_received:1},true],[{events_received:0},false],[{error:{code:190}},false]]){
+   const database=db({claim_delivery_jobs:{data:[{id:DEFINITION,quiz_id:QUIZ,kind:"capi",payload:{event_name:"Lead"},lease_token:QUIZ}]},quiz_tracking_settings:{data:{meta_pixel_id:"123456789"}},quiz_tracking_secrets:{data:{meta_access_token:"fixture-only"}}});
+   globalThis.fetch=async()=>new Response(JSON.stringify(body),{status:200});
+   const {processDeliveryJobs}=loader({"@/lib/supabase/admin":{createAdminClient:()=>database}})("src/lib/security/delivery.ts");
+   await processDeliveryJobs();
+   assert.equal(database.calls.find(c=>c.rpc==="finish_delivery_job").args.p_success,expected);
+  }
+ } finally {globalThis.fetch=original;}
+});

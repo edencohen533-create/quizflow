@@ -30,7 +30,8 @@ export async function processDeliveryJobs() {
           method:"POST",redirect:"error",signal:AbortSignal.timeout(8000),headers:{"Content-Type":"application/json"},
           body:JSON.stringify({access_token:secret.meta_access_token,data:[job.payload]}),
         });
-        success=response.ok;
+        const result = await response.json();
+        success=response.ok && !result.error && Number(result.events_received)>0;
         permanent=!response.ok && response.status>=400 && response.status<500 && ![408,425,429].includes(response.status);
         errorMessage=success?null:"Meta HTTP "+response.status;
       } else {permanent=true;errorMessage="Unknown delivery kind";}
