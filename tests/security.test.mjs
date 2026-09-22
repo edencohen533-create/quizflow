@@ -77,7 +77,7 @@ function db(results = {}) {
   return client;
 }
 const baseNode = { id: "question", type: "question", data: { kind: "question", title: "Trusted title", paramKey: "trusted_key", required: true, answerType: "single_choice", options: [{ id: "option", label: "Trusted label", score: 7 }] } };
-const quiz = { id: QUIZ, workspaceId: WORKSPACE, status: "active", name: "QA", slug: "qa", nodes: [baseNode, { id: "end", type: "end", data: { kind: "end", title: "Done" } }] };
+const quiz = { id: QUIZ, workspaceId: WORKSPACE, status: "active", name: "QA", slug: "qa", edges:[{source:"start",target:"question"},{source:"question",target:"end"}], nodes: [{id:"start",type:"start",data:{kind:"start"}}, baseNode, { id: "end", type: "end", data: { kind: "end", title: "Done" } }] };
 const publicSession = session.issuePublicSession(QUIZ, WORKSPACE);
 const claims = session.verifyPublicSession(request({}, { authorization: "Bearer " + publicSession.token }));
 function publicRoute(filename, database, overrides = {}) {
@@ -235,7 +235,7 @@ test("submission uses signed IDs and server-calculated scores; retries ignore du
 test("submission failures are visible; no later writes continue after failure", async () => {
   const database = db({ submit_quiz_response: { error: { message: "secret details" } } });
   const POST = publicRoute("src/app/api/quiz-submissions/route.ts", database);
-  const response = await POST(request({ lead: { name: "Test" }, answers: [] }));
+  const response = await POST(request({ lead: { name: "Test" }, answers: [{nodeId:"question",optionIds:["option"],answerLabel:"label"}] }));
   assert.equal(response.status, 503);
   assert.equal(database.calls.length, 1);
   assert.doesNotMatch(await response.text(), /secret/);
@@ -413,4 +413,12 @@ test("delivery worker records retry for 503 and terminal failure for 400",async(
  const finish=database.calls.find(c=>c.rpc==="finish_delivery_job");
  assert.equal(finish.args.p_success,status===200);assert.equal(finish.args.p_permanent,status===400);
  }
+});
+
+test("submission path ignores disconnected contact requirements and rejects skipped questions",()=>{
+ const {submissionPath}=loader()("src/lib/security/submission-path.ts");
+ const disconnected={...quiz,nodes:[...quiz.nodes,{id:"orphan",type:"lead_details",data:{kind:"lead_details",showConsent:true}}]};
+ const valid=answers.normalizeAnswers([{nodeId:"question",optionIds:["option"],answerLabel:"label"}],quiz.nodes);
+ assert.equal(submissionPath(disconnected,valid,"session").some(n=>n.id==="orphan"),false);
+ assert.throws(()=>submissionPath(disconnected,[],"session"),/Required answer/);
 });

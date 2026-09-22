@@ -1,3 +1,4 @@
+import { submissionPath } from "@/lib/security/submission-path";
 import { after } from "next/server";
 import { processDeliveryJobs } from "@/lib/security/delivery";
 import { NextResponse } from "next/server";
@@ -16,13 +17,14 @@ export const POST = securePost(async (req, body) => {
   const email = stringField(lead.email, 254);
   if (!name && !phone && !email) throw new HttpError(400, "Contact details required");
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, "Invalid email");
-  const detailNodes = quiz.nodes.filter((n) => n.data.kind === "lead_details").map((n) => n.data);
+  const answers = normalizeAnswers(body.answers, quiz.nodes);
+  const path = submissionPath(quiz, answers, session.sessionId, stringField(lead.utmSource,256));
+  const detailNodes = path.filter((n) => n.data.kind === "lead_details").map((n) => n.data);
   for (const data of detailNodes) {
     if (data.kind !== "lead_details") continue;
     if (data.showConsent && lead.consent !== true) throw new HttpError(400, "Consent required");
     if (data.showPhone && data.requirePhoneIL && !isValidIsraeliPhone(phone)) throw new HttpError(400, "Invalid phone");
   }
-  const answers = normalizeAnswers(body.answers, quiz.nodes);
   const score = answers.reduce((sum, a) => sum + a.score, 0);
   const thresholds = quiz.nodes.find((n) => n.data.kind === "score")?.data;
   const hot = thresholds?.kind === "score" ? thresholds.hotThreshold : 26;

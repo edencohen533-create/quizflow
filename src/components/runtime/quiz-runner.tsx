@@ -111,7 +111,7 @@ interface LeadInfoState {
 
 export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSession }) {
   const supabase = useMemo(() => createClient(), []);
-  const nodesById = useMemo(() => new Map(quiz.nodes.map((node) => [node.id, node])), [quiz.nodes]);
+  const nodesById = useMemo(() => new Map(quiz.nodes.map((node): [string, QuizNode] => [node.id, node.data.kind==="action" && node.data.actionKind==="redirect" ? {...node,type:"end",data:{kind:"end",title:"ממשיכים...",text:"",redirectEnabled:true,redirectUrl:node.data.redirectUrl,redirectDelaySeconds:0}} : node])), [quiz.nodes]);
   const searchParams = useSearchParams();
   const utmSource = searchParams.get("utm_source") ?? undefined;
   const startedRef = useRef(false);
