@@ -62,7 +62,7 @@ begin
  select q.flow_revision into revision from public.quizzes q join public.workspaces w on w.id=q.workspace_id
  where q.id=p_quiz_id and w.owner_id=auth.uid() for update of q;
  if not found then raise exception 'Not authorized' using errcode='42501'; end if;
- if revision<>p_expected_revision then raise exception 'Flow changed in another editor; reload before saving' using errcode='40001'; end if;
+ if revision<>p_expected_revision then raise exception 'Flow changed in another editor; reload before saving' using errcode='PT409'; end if;
  if jsonb_typeof(p_nodes)<>'array' or jsonb_typeof(p_edges)<>'array' or jsonb_array_length(p_nodes)>500 or jsonb_array_length(p_edges)>2000 then raise exception 'Invalid graph'; end if;
  if exists(select 1 from jsonb_array_elements(p_nodes) n where n->>'id' is null or n->>'type' is null or n->'data'->>'kind' is distinct from n->>'type') then raise exception 'Invalid node'; end if;
  if exists(select 1 from jsonb_array_elements(p_edges)e where not exists(select 1 from jsonb_array_elements(p_nodes)n where n->>'id'=e->>'source') or not exists(select 1 from jsonb_array_elements(p_nodes)n where n->>'id'=e->>'target')) then raise exception 'Invalid edge'; end if;

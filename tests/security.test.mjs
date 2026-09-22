@@ -346,7 +346,7 @@ test("flow revision advances only after confirmed atomic save",async()=>{
  assert.equal(state.revision,5);assert.equal(database.calls[0].args.p_expected_revision,4);
 });
 test("stale editor receives actionable conflict without overwriting revision",async()=>{
- const database=db({save_quiz_flow:{error:{code:"40001"}}}),state={revision:4};
+ const database=db({save_quiz_flow:{error:{code:"PT409"}}}),state={revision:4};
  await assert.rejects(loader()("src/lib/supabase/queries.ts").saveFlow(database,QUIZ,[],[],state),/חלון אחר/);
  assert.equal(state.revision,4);
 });

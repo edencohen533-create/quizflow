@@ -1,0 +1,14 @@
+# Only explicitly declared hosted settings are managed by config push.
+project_id = "quizflow"
+
+[auth]
+site_url = "https://quizflow-flax.vercel.app"
+additional_redirect_urls = [
+  "https://quizflow-flax.vercel.app/auth/confirm",
+  "https://quizflow-flax.vercel.app/auth/reset-password",
+  "https://quizflow-edencohen533-9754s-projects.vercel.app/",
+  "https://quizflow-edencohen533-9754s-projects.vercel.app/**",
+  "https://quizflow-*-edencohen533-9754s-projects.vercel.app",
+  "https://quizflow-*-edencohen533-9754s-projects.vercel.app/**"
+]
+minimum_password_length = 12

@@ -13,7 +13,7 @@ begin
  begin
  perform public.save_quiz_flow('30000000-0000-4000-8000-000000000081',0,'[]','[]');
  raise exception 'stale revision accepted';
- exception when serialization_failure then null; end;
+ exception when sqlstate 'PT409' then null; end;
  if (select count(*) from public.quiz_nodes where quiz_id='30000000-0000-4000-8000-000000000081')<>1 then raise exception 'conflict deleted graph'; end if;
  begin
  perform public.submit_quiz_response('{}','{}','[]');

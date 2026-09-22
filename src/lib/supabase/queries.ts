@@ -218,7 +218,7 @@ export function saveFlow(supabase: SupabaseClient, quizId: string, nodes: QuizNo
       p_nodes: snapshot.nodes.map((n) => nodeToRow(quizId, n)),
       p_edges: snapshot.edges.map((e) => edgeToRow(quizId, e)),
     });
-    if (error?.code === "40001") throw new Error("השאלון השתנה בחלון אחר. העתיקו את השינויים וטענו מחדש לפני שמירה.");
+    if (error?.code === "PT409" || error?.code === "40001") throw new Error("השאלון השתנה בחלון אחר. העתיקו את השינויים וטענו מחדש לפני שמירה.");
     if (error) throw error;
     if (typeof data !== "number") throw new Error("השמירה לא אושרה");
     state.revision = data;
