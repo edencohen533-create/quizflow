@@ -7,7 +7,7 @@ import { KpiCard } from "@/components/dashboard/kpi-card";
 import { LeadsChart } from "@/components/dashboard/leads-chart-lazy";
 import { QuizStatusBadge, LeadStatusBadge } from "@/components/shared/status-badges";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceId, listLeads, listQuizzes } from "@/lib/supabase/queries";
+import { getWorkspaceId, listLeadCounts, listQuizzes, listRecentLeads } from "@/lib/supabase/queries";
 import { AnalyticsPoint } from "@/lib/types";
 
 function buildLeadsPerDay(leads: { createdAt: string }[]): AnalyticsPoint[] {
@@ -26,7 +26,11 @@ function buildLeadsPerDay(leads: { createdAt: string }[]): AnalyticsPoint[] {
 export default async function DashboardPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
-  const [quizzes, leads] = await Promise.all([listQuizzes(supabase, workspaceId), listLeads(supabase, workspaceId)]);
+  const [quizzes, leads, recentLeads] = await Promise.all([
+    listQuizzes(supabase, workspaceId),
+    listLeadCounts(supabase, workspaceId),
+    listRecentLeads(supabase, workspaceId, 5),
+  ]);
 
   const activeQuizzes = quizzes.filter((q) => q.status === "active").length;
   const now = new Date();
@@ -39,7 +43,6 @@ export default async function DashboardPage() {
 
   const chartData = buildLeadsPerDay(leads);
   const recentQuizzes = quizzes.slice(0, 5);
-  const recentLeads = leads.slice(0, 5);
 
   return (
     <div className="p-6 md:p-8 space-y-6 max-w-[1400px]">

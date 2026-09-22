@@ -212,13 +212,43 @@ export async function saveFlow(supabase: SupabaseClient, quizId: string, nodes: 
 // the quizzes list's "X leads this month" stat) — avoids listLeads()'s full
 // fetch (notes/history/answers batched per lead) when only quiz_id and
 // created_at are needed.
-export async function listLeadCounts(supabase: SupabaseClient, workspaceId: string): Promise<{ quizId: string; createdAt: string }[]> {
+export async function listLeadCounts(
+  supabase: SupabaseClient,
+  workspaceId: string
+): Promise<{ quizId: string; createdAt: string; category: "hot" | "warm" | "cold" }[]> {
   const { data, error } = await supabase
     .from("leads")
-    .select("quiz_id, created_at")
+    .select("quiz_id, created_at, category")
     .eq("workspace_id", workspaceId);
   if (error) throw error;
-  return (data ?? []).map((r) => ({ quizId: r.quiz_id as string, createdAt: r.created_at as string }));
+  return (data ?? []).map((r) => ({
+    quizId: r.quiz_id as string,
+    createdAt: r.created_at as string,
+    category: r.category as "hot" | "warm" | "cold",
+  }));
+}
+
+// Lightweight variant for screens that only need to display the N most
+// recent leads (e.g. the dashboard's "recent leads" table) — same
+// avoidance of listLeads()'s full per-lead fetch as listLeadCounts() above.
+export async function listRecentLeads(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  limit: number
+): Promise<{ id: string; name: string; quizName: string; status: LeadStatus }[]> {
+  const { data, error } = await supabase
+    .from("leads")
+    .select("id, name, status, quizzes(name)")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    name: (r.name as string | null) ?? "",
+    quizName: (r.quizzes as unknown as { name: string } | null)?.name ?? "",
+    status: r.status as LeadStatus,
+  }));
 }
 
 export async function listLeads(supabase: SupabaseClient, workspaceId: string): Promise<Lead[]> {
