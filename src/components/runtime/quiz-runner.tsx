@@ -451,7 +451,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
                   {isActive && history.length > 1 && (
                     <button
                       onClick={goBack}
-                      className="mt-3 flex items-center gap-1.5 rounded-full bg-black/5 px-4 py-2 text-xs font-medium"
+                      className="mt-3 flex w-fit items-center gap-1.5 self-end rounded-full bg-black/5 px-4 py-2 text-xs font-medium"
                       style={{ color: PALETTE.text }}
                     >
                       חזרה
