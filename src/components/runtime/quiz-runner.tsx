@@ -342,14 +342,16 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
           {entries.map((entry) => {
             if (entry.kind === "user") {
               return (
-                <div key={entry.id} className="flex flex-col items-start gap-1">
-                  <div
-                    className="max-w-[75%] rounded-[20px] px-5 py-3 leading-relaxed"
-                    style={{ background: PALETTE.bubbleUser, color: PALETTE.text }}
-                  >
-                    {entry.text}
+                <div key={entry.id} className="flex justify-end">
+                  <div className="flex max-w-[75%] flex-col items-end gap-1">
+                    <div
+                      className="rounded-[20px] px-5 py-3 leading-relaxed"
+                      style={{ background: PALETTE.bubbleUser, color: PALETTE.text }}
+                    >
+                      {entry.text}
+                    </div>
+                    <span className="px-1 text-xs" style={{ color: PALETTE.muted }}>{timeLabel(entry.ts)}</span>
                   </div>
-                  <span className="px-1 text-xs" style={{ color: PALETTE.muted }}>{timeLabel(entry.ts)}</span>
                 </div>
               );
             }
@@ -378,37 +380,39 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
             const isActive = entry.nodeId === activeNodeId;
 
             return (
-              <div key={entry.id} ref={isActive ? activeNodeRef : undefined} className="flex flex-col items-end gap-1">
-                <div className="flex items-end gap-2">
-                  <Avatar url={quiz.theme.avatarUrl} />
-                  <div
-                    className="max-w-[85%] rounded-[22px] px-5 py-4 leading-relaxed"
-                    style={{ background: PALETTE.bubbleBot, color: PALETTE.text }}
-                  >
-                    <BotNodeContent node={node} params={paramValues} />
-                    {isActive && (
-                      <div className="mt-4">
-                        <NodeControls
-                          node={node}
-                          palette={PALETTE}
-                          leadInfo={leadInfo}
-                          onLeadInfoChange={(patch) => setLeadInfo((s) => ({ ...s, ...patch }))}
-                          onComplete={(text, handle, answer) => handleComplete(node, text, handle, answer)}
-                        />
-                      </div>
-                    )}
+              <div key={entry.id} className="flex justify-start">
+                <div ref={isActive ? activeNodeRef : undefined} className="flex max-w-[85%] flex-col items-end gap-1">
+                  <div className="flex w-full items-end gap-2">
+                    <Avatar url={quiz.theme.avatarUrl} />
+                    <div
+                      className="min-w-0 flex-1 rounded-[22px] px-5 py-4 leading-relaxed"
+                      style={{ background: PALETTE.bubbleBot, color: PALETTE.text }}
+                    >
+                      <BotNodeContent node={node} params={paramValues} />
+                      {isActive && (
+                        <div className="mt-4">
+                          <NodeControls
+                            node={node}
+                            palette={PALETTE}
+                            leadInfo={leadInfo}
+                            onLeadInfoChange={(patch) => setLeadInfo((s) => ({ ...s, ...patch }))}
+                            onComplete={(text, handle, answer) => handleComplete(node, text, handle, answer)}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  <span className="px-1 text-xs" style={{ color: PALETTE.muted }}>{timeLabel(entry.ts)}</span>
+                  {isActive && history.length > 1 && (
+                    <button
+                      onClick={goBack}
+                      className="px-1 text-xs underline underline-offset-2"
+                      style={{ color: PALETTE.muted }}
+                    >
+                      ‹ חזרה לשאלה הקודמת
+                    </button>
+                  )}
                 </div>
-                <span className="px-1 text-xs" style={{ color: PALETTE.muted }}>{timeLabel(entry.ts)}</span>
-                {isActive && history.length > 1 && (
-                  <button
-                    onClick={goBack}
-                    className="px-1 text-xs underline underline-offset-2"
-                    style={{ color: PALETTE.muted }}
-                  >
-                    ‹ חזרה לשאלה הקודמת
-                  </button>
-                )}
               </div>
             );
           })}
@@ -761,7 +765,7 @@ function ResultCard({
   }, [shouldRedirect, secondsLeft, data.redirectUrl]);
 
   return (
-    <div className="flex justify-end">
+    <div className="flex justify-start">
       <div
         className="max-w-[92%] rounded-[24px] border-2 bg-white p-6 text-center shadow-md sm:max-w-[85%]"
         style={{ borderColor: PALETTE.buttonBorder, color: PALETTE.text }}
