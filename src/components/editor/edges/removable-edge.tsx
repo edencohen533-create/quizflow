@@ -25,6 +25,7 @@ export function RemovableEdge({
   id,
   source,
   target,
+  sourceHandleId,
   sourceX,
   sourceY,
   targetX,
@@ -36,7 +37,14 @@ export function RemovableEdge({
   selected,
 }: EdgeProps) {
   const { deleteElements, getNode } = useReactFlow();
-  const sourceAnchor = nodeAnchor(getNode(source), sourcePosition, { x: sourceX, y: sourceY });
+  // A node with a single generic handle (no id) gets centered on the
+  // node's own edge for a consistent anchor. A node with several distinct
+  // handles — e.g. one per answer option — must keep each edge's real,
+  // per-handle position instead, or every option's line would collapse
+  // onto the same point.
+  const sourceAnchor = sourceHandleId
+    ? { x: sourceX, y: sourceY }
+    : nodeAnchor(getNode(source), sourcePosition, { x: sourceX, y: sourceY });
   const targetAnchor = nodeAnchor(getNode(target), targetPosition, { x: targetX, y: targetY });
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX: sourceAnchor.x,
