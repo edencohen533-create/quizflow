@@ -14,7 +14,7 @@ export function stringField(value: unknown, max = 256, required = false): string
     if (required) throw new HttpError(400, "Missing field");
     return "";
   }
-  if (typeof value !== "string" || value.length > max || /[^@-^H\u000b^L^N-^_]/.test(value) || (required && !value.trim())) {
+  if (typeof value !== "string" || value.length > max || Array.from(value).some((c) => { const n = c.charCodeAt(0); return n < 32 && n !== 9 && n !== 10 && n !== 13; }) || (required && !value.trim())) {
     throw new HttpError(400, "Invalid field");
   }
   return value;

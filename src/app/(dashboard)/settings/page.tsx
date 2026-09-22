@@ -1,4 +1,5 @@
 "use client";
+import { AccountSecurity } from "@/components/security/account-security";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -47,9 +48,9 @@ export default function SettingsPage() {
   async function handleSave() {
     if (!workspaceId) return;
     setSaving(true);
-    await Promise.all([updateProfileName(supabase, fullName), updateWorkspaceName(supabase, workspaceId, workspaceName)]);
-    setSaving(false);
-    toast.success("הפרטים נשמרו");
+    try { await Promise.all([updateProfileName(supabase, fullName), updateWorkspaceName(supabase, workspaceId, workspaceName)]); toast.success("הפרטים נשמרו"); }
+    catch { toast.error("שמירת הפרטים נכשלה"); }
+    finally { setSaving(false); }
   }
 
   if (loading) {
@@ -84,6 +85,7 @@ export default function SettingsPage() {
           </Button>
         </CardContent>
       </Card>
+      <AccountSecurity />
       <Card className="opacity-70">
         <CardHeader><CardTitle className="text-base">חיוב וניהול משתמשים</CardTitle></CardHeader>
         <CardContent className="text-sm text-muted-foreground">

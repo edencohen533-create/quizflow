@@ -48,6 +48,13 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  if(user){
+    const {data:assurance,error}=await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if(error || (assurance?.nextLevel==="aal2" && assurance.currentLevel!=="aal2")){
+      const url=request.nextUrl.clone();url.pathname="/auth/mfa";return NextResponse.redirect(url);
+    }
+  }
+
   if (user && isLogin) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
