@@ -111,14 +111,14 @@ revoke all on function public.submit_quiz_response(jsonb,jsonb,jsonb) from publi
 grant execute on function public.submit_quiz_response(jsonb,jsonb,jsonb) to service_role;
 
 create or replace function public.claim_delivery_jobs(p_limit integer default 5)
-returns setof public.delivery_jobs language plpgsql security definer set search_path=public,pg_temp as $
+returns setof public.delivery_jobs language plpgsql security definer set search_path=public,pg_temp as $$
 begin
  update public.delivery_jobs set status='dead',finished_at=now(),last_error='Retry budget exhausted after expired lease'
  where status='running' and available_at<=now() and attempts>=8;
  return query update public.delivery_jobs j set status='running',attempts=attempts+1,available_at=now()+interval '2 minutes',lease_token=gen_random_uuid()
  where j.id in(select id from public.delivery_jobs where status in('pending','running') and available_at<=now() and attempts<8 order by available_at for update skip locked limit least(greatest(p_limit,1),10))
  returning j.*;
-end $;
+end $$;
 revoke all on function public.claim_delivery_jobs(integer) from public,anon,authenticated;
 grant execute on function public.claim_delivery_jobs(integer) to service_role;
 
