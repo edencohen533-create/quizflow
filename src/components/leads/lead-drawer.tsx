@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Copy, MessageCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Copy, Loader2, MessageCircle } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -22,8 +22,66 @@ import { Lead, LEAD_STATUS_LABELS, LeadStatus } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { addLeadNote as addLeadNoteQuery, updateLeadStatus as updateLeadStatusQuery } from "@/lib/supabase/queries";
 import { toast } from "sonner";
+import { getLeadDetails } from "@/lib/supabase/queries";
+import { useWorkspaceId } from "@/components/layout/workspace-provider";
 
+// The list mounts this loader only after a row is opened. Its key is the
+// selected lead id, so an old request cannot replace a newly selected lead.
 export function LeadDrawer({
+  lead: summary,
+  onOpenChange,
+  onUpdated,
+}: {
+  lead: Lead;
+  onOpenChange: (open: boolean) => void;
+  onUpdated?: (lead: Lead) => void;
+}) {
+  const supabase = useMemo(() => createClient(), []);
+  const workspaceId = useWorkspaceId();
+  const [detail, setDetail] = useState<Lead | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    let cancelled = false;
+    getLeadDetails(supabase, workspaceId, summary.id).then((lead) => {
+      if (cancelled) return;
+      if (!lead) {
+        setError("הליד לא נמצא");
+        return;
+      }
+      setDetail(lead);
+      setError(null);
+      if (revision > 0) onUpdated?.(lead);
+    }).catch(() => {
+      if (!cancelled) setError("לא ניתן לטעון את פרטי הליד");
+    });
+    return () => { cancelled = true; };
+  }, [supabase, workspaceId, summary.id, revision, onUpdated]);
+
+  if (!detail || error) {
+    return (
+      <Sheet open onOpenChange={onOpenChange}>
+        <SheetContent side="left" className="w-full sm:max-w-md">
+          <SheetHeader><SheetTitle>{summary.name}</SheetTitle></SheetHeader>
+          <div className="px-4 py-6" role="status">
+            {error ? (
+              <div className="space-y-3">
+                <p>{error}</p>
+                <Button variant="outline" onClick={() => { setError(null); setRevision((value) => value + 1); }}>נסה שוב</Button>
+              </div>
+            ) : <Loader2 className="size-5 animate-spin" aria-label="טוען פרטי ליד" />}
+          </div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  return <LeadDrawerContent lead={detail} onOpenChange={onOpenChange} onUpdated={() => setRevision((value) => value + 1)} />;
+}
+
+function LeadDrawerContent({
   lead,
   onOpenChange,
   onUpdated,

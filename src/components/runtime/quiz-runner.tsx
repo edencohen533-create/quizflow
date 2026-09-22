@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
+import { getImageProps } from "next/image";
+import { isStoredQuizImage } from "@/lib/quiz-images";
 import { ChevronDown, ArrowLeft } from "lucide-react";
 import { Quiz, QuizNode, QuizTheme, LeadAnswer } from "@/lib/types";
 import { getStartNode, resolveRenderable, isValidIsraeliPhone } from "@/lib/quiz-runtime";
@@ -11,10 +14,11 @@ import { triggerIntegrations } from "@/lib/integrations";
 import { getTrackingSettings, listTrackingEvents } from "@/lib/supabase/tracking-queries";
 import { fireTrackingEvent } from "@/lib/tracking-runtime";
 import { QuizTrackingEvent, QuizTrackingSettings, QuizSessionAnswer } from "@/lib/types";
-import { Checkbox } from "@/components/ui/checkbox";
 import { SunAvatar } from "@/components/runtime/sun-avatar";
 import { renderRichText } from "@/lib/rich-text";
 import { FONT_FAMILY_CSS } from "@/lib/quiz-fonts";
+
+const Checkbox = dynamic(() => import("@/components/ui/checkbox").then((m) => m.Checkbox));
 
 type Palette = ReturnType<typeof buildPalette>;
 
@@ -49,11 +53,13 @@ function interpolateParams(text: string, values: Record<string, string>): string
 
 function Avatar({ url, size = 34 }: { url?: string; size?: number }) {
   if (url) {
+    const imageProps = isStoredQuizImage(url)
+      ? getImageProps({ src: url, width: size, height: size, alt: "", loading: "eager" }).props
+      : { src: url, alt: "", width: size, height: size };
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={url}
-        alt=""
+        {...imageProps}
         className="shrink-0 rounded-full bg-white object-contain"
         style={{ width: size, height: size }}
       />
@@ -102,6 +108,7 @@ interface LeadInfoState {
 
 export function QuizRunner({ quiz }: { quiz: Quiz }) {
   const supabase = useMemo(() => createClient(), []);
+  const nodesById = useMemo(() => new Map(quiz.nodes.map((node) => [node.id, node])), [quiz.nodes]);
   const searchParams = useSearchParams();
   const utmSource = searchParams.get("utm_source") ?? undefined;
   const startedRef = useRef(false);
@@ -242,7 +249,7 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
       if (submittedRef.current) return;
       const nodeId = activeNodeIdRef.current;
       if (!nodeId) return;
-      const node = quiz.nodes.find((n) => n.id === nodeId);
+      const node = nodesById.get(nodeId);
       if (!node) return;
       const mergedAnswers = answersRef.current;
       const mergedScore = Object.values(mergedAnswers).reduce((sum, a) => sum + a.score, 0);
@@ -395,12 +402,12 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
             }
 
             if (entry.kind === "result") {
-              const node = quiz.nodes.find((n) => n.id === entry.nodeId);
+              const node = nodesById.get(entry.nodeId);
               if (!node || node.data.kind !== "end") return null;
               return <ResultCard key={entry.id} data={node.data} palette={PALETTE} avatarUrl={quiz.theme.avatarUrl} params={paramValues} />;
             }
 
-            const node = quiz.nodes.find((n) => n.id === entry.nodeId);
+            const node = nodesById.get(entry.nodeId);
             if (!node) return null;
             const isActive = entry.nodeId === activeNodeId;
 

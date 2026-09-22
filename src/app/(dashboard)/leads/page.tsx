@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { Download, Search, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,11 +15,12 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LeadStatusBadge, CategoryBadge } from "@/components/shared/status-badges";
-import { LeadDrawer } from "@/components/leads/lead-drawer";
 import { createClient } from "@/lib/supabase/client";
-import { deleteLead, listLeads } from "@/lib/supabase/queries";
+import { deleteLead, listLeadSummaries } from "@/lib/supabase/queries";
 import { useWorkspaceId } from "@/components/layout/workspace-provider";
 import { LEAD_STATUS_LABELS, Lead, LeadStatus } from "@/lib/types";
+
+const LeadDrawer = dynamic(() => import("@/components/leads/lead-drawer").then((m) => m.LeadDrawer));
 
 function exportCsv(leads: Lead[]) {
   const header = ["שם", "טלפון", "אימייל", "שאלון", "ציון", "סטטוס", "מקור", "שם המודעה", "תאריך"];
@@ -49,12 +51,13 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all");
   const [selected, setSelected] = useState<Lead | null>(null);
 
   const load = useCallback(async () => {
     if (!workspaceId) return;
-    const data = await listLeads(supabase, workspaceId);
+    const data = await listLeadSummaries(supabase, workspaceId);
     setLeads(data);
     setLoading(false);
   }, [supabase, workspaceId]);
@@ -71,16 +74,22 @@ export default function LeadsPage() {
     load();
   }, [load]);
 
+  const handleLeadUpdated = useCallback((updated: Lead) => {
+    setLeads((rows) => rows.map((row) => row.id === updated.id ? updated : row));
+    setSelected((current) => current?.id === updated.id ? updated : current);
+  }, []);
+
   const filtered = useMemo(() => {
+    const normalizedQuery = deferredQuery.toLowerCase();
     return leads.filter((l) => {
       const matchesQuery =
-        l.name.toLowerCase().includes(query.toLowerCase()) ||
-        l.phone.includes(query) ||
-        l.email.toLowerCase().includes(query.toLowerCase());
+        l.name.toLowerCase().includes(normalizedQuery) ||
+        l.phone.includes(deferredQuery) ||
+        l.email.toLowerCase().includes(normalizedQuery);
       const matchesStatus = statusFilter === "all" || l.status === statusFilter;
       return matchesQuery && matchesStatus;
     });
-  }, [leads, query, statusFilter]);
+  }, [leads, deferredQuery, statusFilter]);
 
   if (loading) {
     return (
@@ -177,7 +186,7 @@ export default function LeadsPage() {
         </CardContent>
       </Card>
 
-      <LeadDrawer lead={selected} onOpenChange={(open) => !open && setSelected(null)} onUpdated={load} />
+      {selected && <LeadDrawer key={selected.id} lead={selected} onOpenChange={(open) => !open && setSelected(null)} onUpdated={handleLeadUpdated} />}
     </div>
   );
 }
