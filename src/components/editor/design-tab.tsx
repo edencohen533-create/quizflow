@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -16,14 +16,7 @@ import { updateQuizTheme } from "@/lib/supabase/queries";
 import { Quiz, QuizTheme } from "@/lib/types";
 import { ImageUploadField } from "@/components/editor/image-upload-field";
 import { SunAvatar } from "@/components/runtime/sun-avatar";
-
-// Mirrors quiz-runner.tsx's FONT_FAMILY_VAR — same CSS variables next/font
-// exposes on <html> in layout.tsx.
-const FONT_FAMILY_VAR: Record<QuizTheme["fontFamily"], string> = {
-  assistant: "var(--font-assistant)",
-  heebo: "var(--font-heebo)",
-  nunito: "var(--font-nunito)",
-};
+import { FONT_FAMILY_CSS, GOOGLE_FONT_STYLESHEET } from "@/lib/quiz-fonts";
 
 // Mirrors quiz-runner.tsx's buildPalette() — keep the fallback colors in sync
 // if that function's defaults ever change.
@@ -38,7 +31,7 @@ function buildPreviewPalette(theme: QuizTheme) {
     text: theme.textColor || "#535C82",
     muted: theme.mutedTextColor || "#9AA0BE",
     radius: theme.cornerRadius ?? 22,
-    fontFamily: FONT_FAMILY_VAR[theme.fontFamily] ?? FONT_FAMILY_VAR.assistant,
+    fontFamily: FONT_FAMILY_CSS[theme.fontFamily] ?? FONT_FAMILY_CSS.assistant,
     fontSize: theme.fontSize ?? 16,
   };
 }
@@ -86,6 +79,22 @@ export function DesignTab({ quiz, onThemeChange }: { quiz: Quiz; onThemeChange?:
       updateQuizTheme(supabase, quiz.id, merged);
     }, 400);
   }
+
+  // Loads the picked font's stylesheet on demand, only in this preview —
+  // avoids shipping every optional font to every dashboard page load.
+  useEffect(() => {
+    const href = GOOGLE_FONT_STYLESHEET[theme.fontFamily];
+    if (!href) return;
+    const id = "qf-preview-font";
+    let link = document.getElementById(id) as HTMLLinkElement | null;
+    if (!link) {
+      link = document.createElement("link");
+      link.id = id;
+      link.rel = "stylesheet";
+      document.head.appendChild(link);
+    }
+    link.href = href;
+  }, [theme.fontFamily]);
 
   const palette = buildPreviewPalette(theme);
   const previewBg = theme.backgroundImageUrl ? `url(${theme.backgroundImageUrl}) center/cover` : palette.page;
