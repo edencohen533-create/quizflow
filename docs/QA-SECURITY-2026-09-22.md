@@ -19,7 +19,7 @@ Scope: QuizFlow application, hosted Supabase project, preview and production dep
 
 ## Verification completed
 
-- Remote deployment gates run security/reliability unit tests, performance regression tests, targeted ESLint, TypeScript, optimized Next.js build and production dependency audit. See the final deployment logs for authoritative counts.
+- 100 automated checks passed (89 security/reliability and 11 performance). Remote deployment gates also run targeted ESLint, TypeScript, an optimized Next.js build and dependency audit (zero reported vulnerabilities).
 - Two actual isolated Auth accounts exercised password login, workspace provisioning, own editor save/publish, foreign editor denial, leads and inbox.
 - Browser and API TOTP enrollment/challenge succeeded. A pre-MFA aal1 token lost workspace access after enrollment; aal2 retained access. Browser recovery changed a fixture password and logged in with the new password.
 - Actual Storage API tests: own PNG upload succeeded; foreign-prefix upload/overwrite and foreign deletion failed to change the object; SVG, HTML and files over 5 MiB were rejected.
