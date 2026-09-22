@@ -13,6 +13,7 @@ import ReactFlow, {
   Edge,
   Node,
   useReactFlow,
+  useUpdateNodeInternals,
   BackgroundVariant,
 } from "reactflow";
 import "reactflow/dist/style.css";
@@ -133,6 +134,7 @@ function FlowEditorInner({
   const [edges, setEdges, onEdgesChange] = useEdgesState(toFlowEdges(initialEdges));
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const { screenToFlowPosition, fitView } = useReactFlow();
+  const updateNodeInternals = useUpdateNodeInternals();
 
   const undoStack = useRef<HistoryEntry[]>([]);
   const redoStack = useRef<HistoryEntry[]>([]);
@@ -295,6 +297,15 @@ function FlowEditorInner({
       const next = nds.map((n) => (n.id === selectedNodeId ? { ...n, data: { ...data, _connected: (n.data as { _connected?: boolean })._connected } } : n));
       scheduleSave(next, edges);
       return next;
+    });
+    // Editing content (e.g. adding an option, a longer question) can resize
+    // the node's card, but react-flow's own resize-observer doesn't always
+    // catch it in time — a stale cached handle position then makes
+    // dragging a new connection to/from this node silently fail until the
+    // page is reloaded. Forcing a re-measure after the DOM has actually
+    // repainted at the new size closes that gap.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => updateNodeInternals(selectedNodeId));
     });
   }
 
