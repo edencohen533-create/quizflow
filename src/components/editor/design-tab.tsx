@@ -71,22 +71,6 @@ export function DesignTab({ quiz, onThemeChange }: { quiz: Quiz; onThemeChange?:
     <div className="grid lg:grid-cols-[1fr_360px] gap-6 p-6 max-w-6xl">
       <div className="space-y-4">
         <Card>
-          <CardHeader><CardTitle className="text-base">לוגו</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-xs text-muted-foreground">
-              מוצג בראש השאלון החי. אם לא הועלה לוגו, יוצג שם השאלון בתור טקסט.
-            </p>
-            <ImageUploadField
-              value={theme.logoUrl ?? ""}
-              onChange={(url) => patch({ logoUrl: url })}
-              previewClassName="h-16 w-full object-contain bg-white p-2"
-              uploadLabel="העלה לוגו"
-              replaceLabel="החלף לוגו"
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
           <CardHeader><CardTitle className="text-base">אווטאר לצד כל שאלה</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             <p className="text-xs text-muted-foreground">
@@ -186,44 +170,37 @@ export function DesignTab({ quiz, onThemeChange }: { quiz: Quiz; onThemeChange?:
         <p className="text-xs text-muted-foreground mb-2">כך נראה השאלון החי</p>
         <div dir="rtl" className="rounded-2xl border overflow-hidden aspect-[9/16] overflow-y-auto" style={{ background: previewBg }}>
           <div className="p-4 space-y-4">
-            <div className="flex items-center justify-center bg-white py-5 shadow-sm" style={{ borderRadius: palette.radius + 6 }}>
-              {theme.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={theme.logoUrl} alt="" className="h-10 object-contain" />
-              ) : (
-                <p className="text-base font-bold" style={{ color: palette.text }}>{quiz.name}</p>
-              )}
-            </div>
-
-            <div className="flex flex-col items-end gap-1">
-              <div className="flex items-end gap-2">
-                <div
-                  className="max-w-[85%] px-4 py-3 text-sm leading-relaxed"
-                  style={{ background: palette.bubbleBot, color: palette.text, borderRadius: palette.radius }}
-                >
-                  <p className="font-bold">מהו גילך?</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {["עד 30", "31–45", "46–60"].map((label) => (
-                      <span
-                        key={label}
-                        className="rounded-lg border-2 bg-white px-3 py-1.5 text-xs font-semibold"
-                        style={{ borderColor: palette.buttonBorder, color: palette.buttonText }}
-                      >
-                        {label}
-                      </span>
-                    ))}
+            <div className="flex justify-start">
+              <div className="flex max-w-[85%] flex-col items-end gap-1">
+                <div className="flex items-end gap-2">
+                  {theme.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={theme.avatarUrl} alt="" className="size-7 shrink-0 rounded-full object-cover" />
+                  ) : (
+                    <SunAvatar size={28} />
+                  )}
+                  <div
+                    className="min-w-0 px-4 py-3 text-sm leading-relaxed"
+                    style={{ background: palette.bubbleBot, color: palette.text, borderRadius: palette.radius }}
+                  >
+                    <p className="font-bold">מהו גילך?</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {["עד 30", "31–45", "46–60"].map((label) => (
+                        <span
+                          key={label}
+                          className="rounded-lg border-2 bg-white px-3 py-1.5 text-xs font-semibold"
+                          style={{ borderColor: palette.buttonBorder, color: palette.buttonText }}
+                        >
+                          {label}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                {theme.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={theme.avatarUrl} alt="" className="size-7 shrink-0 rounded-full object-cover" />
-                ) : (
-                  <SunAvatar size={28} />
-                )}
               </div>
             </div>
 
-            <div className="flex flex-col items-start gap-1">
+            <div className="flex justify-end">
               <div
                 className="max-w-[75%] px-4 py-2.5 text-sm leading-relaxed"
                 style={{ background: palette.bubbleUser, color: palette.text, borderRadius: Math.max(0, palette.radius - 2) }}

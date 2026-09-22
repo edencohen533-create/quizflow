@@ -167,7 +167,6 @@ export interface QuizEdge {
 export type QuizStatus = "draft" | "active" | "paused";
 
 export interface QuizTheme {
-  logoUrl?: string;
   avatarUrl?: string;
   primaryColor: string;
   backgroundColor: string;

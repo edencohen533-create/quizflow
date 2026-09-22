@@ -363,13 +363,6 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
     <div dir="rtl" className="qf-runner-bg min-h-screen">
       <style>{`.qf-runner-bg{background:${desktopBg};}@media (max-width:767px){.qf-runner-bg{background:${mobileBg};}}`}</style>
       <div className="mx-auto max-w-2xl px-4 pb-32 pt-6 sm:px-6">
-        {quiz.theme.logoUrl && (
-          <div className="mb-8 flex items-center justify-center bg-white px-8 py-10 shadow-sm" style={{ borderRadius: PALETTE.radius + 6 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={quiz.theme.logoUrl} alt={quiz.name} className="h-24 max-w-full object-contain" />
-          </div>
-        )}
-
         <div className="space-y-5">
           {entries.map((entry) => {
             if (entry.kind === "user") {

@@ -43,7 +43,6 @@ export interface QuizEdgeRow {
 
 export interface QuizThemeRow {
   quiz_id: string;
-  logo_url: string | null;
   avatar_url: string | null;
   primary_color: string;
   background_color: string;
@@ -84,7 +83,6 @@ export interface LeadRow {
 
 export function themeRowToTheme(row: QuizThemeRow): QuizTheme {
   return {
-    logoUrl: row.logo_url ?? undefined,
     avatarUrl: row.avatar_url ?? undefined,
     primaryColor: row.primary_color,
     backgroundColor: row.background_color,
@@ -108,7 +106,6 @@ export function themeRowToTheme(row: QuizThemeRow): QuizTheme {
 export function themeToRow(quizId: string, theme: QuizTheme): QuizThemeRow {
   return {
     quiz_id: quizId,
-    logo_url: theme.logoUrl ?? null,
     avatar_url: theme.avatarUrl ?? null,
     primary_color: theme.primaryColor,
     background_color: theme.backgroundColor,
