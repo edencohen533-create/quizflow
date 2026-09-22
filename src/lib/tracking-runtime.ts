@@ -94,7 +94,7 @@ export function fireTrackingEvent(def: QuizTrackingEvent, ctx: FireContext) {
   }
 
   if (def.sendToCustomCode && def.customCode) {
-    sendSandboxTracking("custom:" + ctx.quizId, { code: def.customCode });
+    sendSandboxTracking("custom:" + ctx.quizId, { code: def.customCode }, undefined, ctx.settings.metaPixelId);
   }
 
   if (def.sendToCapi && ctx.settings.metaHasToken && ctx.sessionToken) {

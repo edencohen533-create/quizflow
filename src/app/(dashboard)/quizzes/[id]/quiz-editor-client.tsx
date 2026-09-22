@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ChevronLeft, Eye, Save, Rocket, Loader2, Target } from "lucide-react";
@@ -50,9 +50,16 @@ export function QuizEditorClient({ initialQuiz }: { initialQuiz: Quiz }) {
   const supabase = useMemo(() => createClient(), []);
   const [quiz, setQuiz] = useState<Quiz>(initialQuiz);
   const [nameDraft, setNameDraft] = useState(initialQuiz.name);
+  const flowSaveRef = useRef<(() => Promise<void>) | null>(null);
+  const [saving, setSaving] = useState(false);
   const [savedAgo, setSavedAgo] = useState<string | null>(null);
 
   async function handlePublish() {
+    if (saving) return;
+    setSaving(true);
+    try {
+    await flowSaveRef.current?.();
+    await handleNameBlur();
     // re-fetch live flow state: FlowEditor autosaves nodes/edges directly to
     // Supabase without lifting them back into this component's `quiz` state,
     // so validating against `quiz.nodes` here would check a stale snapshot.
@@ -67,6 +74,20 @@ export function QuizEditorClient({ initialQuiz }: { initialQuiz: Quiz }) {
     await updateQuizMeta(supabase, quiz.id, { status: "active" });
     setQuiz({ ...current, status: "active" });
     toast.success("השאלון פורסם בהצלחה");
+    } catch { toast.error("הפרסום נכשל. השינויים לא פורסמו."); }
+    finally { setSaving(false); }
+  }
+
+  async function handleSave() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await flowSaveRef.current?.();
+      await handleNameBlur();
+      setSavedAgo("נשמר לפני רגע");
+      toast.success("הטיוטה נשמרה");
+    } catch { toast.error("שמירת הטיוטה נכשלה. נסו שוב."); }
+    finally { setSaving(false); }
   }
 
   async function handleNameBlur() {
@@ -97,7 +118,7 @@ export function QuizEditorClient({ initialQuiz }: { initialQuiz: Quiz }) {
           <Input
             value={nameDraft}
             onChange={(e) => setNameDraft(e.target.value)}
-            onBlur={handleNameBlur}
+            onBlur={() => { void handleNameBlur().catch(() => toast.error("שמירת השם נכשלה")); }}
             className="h-8 w-56 border-transparent bg-transparent px-1.5 font-semibold shadow-none hover:border-input focus-visible:border-input"
           />
           <QuizStatusBadge status={quiz.status} />
@@ -114,10 +135,10 @@ export function QuizEditorClient({ initialQuiz }: { initialQuiz: Quiz }) {
               </a>
             }
           />
-          <Button variant="outline" size="sm" onClick={() => setSavedAgo("נשמר לפני רגע")}>
+          <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
             <Save className="size-4" /> שמור טיוטה
           </Button>
-          <Button size="sm" onClick={handlePublish}>
+          <Button size="sm" onClick={handlePublish} disabled={saving}>
             <Rocket className="size-4" /> פרסום
           </Button>
         </div>
@@ -138,12 +159,13 @@ export function QuizEditorClient({ initialQuiz }: { initialQuiz: Quiz }) {
             <TabsTrigger value="share" className="data-[state=active]:bg-accent">שיתוף והטמעה</TabsTrigger>
           </TabsList>
         </div>
-        <TabsContent value="flow" className="flex-1 min-h-0 m-0">
+        <TabsContent value="flow" keepMounted className="flex-1 min-h-0 m-0">
           <FlowEditor
             quizId={quiz.id}
             initialNodes={quiz.nodes}
             initialEdges={quiz.edges}
             onSavedIndicator={setSavedAgo}
+            saveRef={flowSaveRef}
           />
         </TabsContent>
         <TabsContent value="design" className="flex-1 min-h-0 m-0 overflow-auto">

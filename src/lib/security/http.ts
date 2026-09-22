@@ -1,3 +1,4 @@
+import { allowRequest } from "./rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
 export class HttpError extends Error {
@@ -52,6 +53,7 @@ export async function readJson(req: Request, limit = 64 * 1024): Promise<Record<
 export function securePost(handler: (req: NextRequest, body: Record<string, unknown>) => Promise<NextResponse>) {
   return async (req: NextRequest) => {
     try {
+      if (!allowRequest(req)) return NextResponse.json({ ok: false, error: "Too many requests" }, { status: 429, headers: { "Retry-After": "60", "Cache-Control": "no-store" } });
       const response = await handler(req, await readJson(req));
       response.headers.set("Cache-Control", "no-store");
       return response;

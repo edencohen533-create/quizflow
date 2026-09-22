@@ -57,6 +57,8 @@ function db(results = {}) {
         insert(value) { call.insert = value; return chain; },
         upsert(value, options) { call.upsert = value; call.options = options; return chain; },
         update(value) { call.update = value; return chain; },
+        delete() { call.delete = true; return chain; },
+        in(key, value) { call.filters.push(["in:" + key, value]); return chain; },
         eq(key, value) { call.filters.push([key, value]); return chain; },
         neq(key, value) { call.filters.push(["not:" + key, value]); return chain; },
         maybeSingle() { return Promise.resolve(result()); },
@@ -286,3 +288,93 @@ for (const file of ["quiz-submissions", "quiz-sessions/track", "dispatch-integra
     assert.equal(touched, false);
   });
 }
+
+test("per-instance rate limits expire and use separate route budgets", () => {
+  const { allowRequest } = loader()("src/lib/security/rate-limit.ts");
+  const req = new Request("https://quiz.example/api/relay-webhook");
+  for (let i = 0; i < 10; i++) assert.equal(allowRequest(req, 1000), true);
+  assert.equal(allowRequest(req, 1000), false);
+  assert.equal(allowRequest(new Request("https://quiz.example/api/analytics"), 1000), true);
+  assert.equal(allowRequest(req, 62000), true);
+});
+
+for (const route of ["tracking/save-token", "tracking/test-meta"]) {
+  test(route + " never touches admin secrets when a visitor can read but does not own a quiz", async () => {
+    let adminTouched = false;
+    const database = db({ quizzes: { data: { id: QUIZ, workspace_id: WORKSPACE } } });
+    const POST = loader({
+      "@/lib/supabase/server": { createClient: async () => database },
+      "@/lib/supabase/admin": { createAdminClient: () => { adminTouched = true; throw new Error("Must not access secrets"); } },
+    })("src/app/api/" + route + "/route.ts").POST;
+    assert.equal((await POST(request({ quizId: QUIZ, token: "valid-looking-token" }))).status, 403);
+    assert.equal(adminTouched, false);
+  });
+}
+test("relay requires authentication and ignores caller-supplied URLs/secrets", async () => {
+  let delivered = false;
+  const database = db();
+  database.auth.getUser = async () => ({ data: { user: null } });
+  const POST = loader({
+    "@/lib/supabase/server": { createClient: async () => database },
+    "@/lib/security/webhook": { sendWebhook: async () => { delivered = true; } },
+  })("src/app/api/relay-webhook/route.ts").POST;
+  assert.equal((await POST(request({ integrationId: DEFINITION, url: "https://127.0.0.1", secret: "fake" }))).status, 401);
+  assert.equal(delivered, false);
+});
+test("public APIs reject paused quizzes and mismatched workspace claims", async () => {
+  for (const current of [{ ...quiz, status: "paused" }, { ...quiz, workspaceId: "other" }]) {
+    const module = loader({
+      "@/lib/supabase/admin": { createAdminClient: () => ({}) },
+      "@/lib/supabase/queries": { fetchQuizFull: async () => current },
+    })("src/lib/security/public-quiz.ts");
+    await assert.rejects(module.requirePublicQuiz(request({}, { authorization: "Bearer " + publicSession.token })), (e) => e.status === 403);
+  }
+});
+test("flow write failure never deletes the previous graph", async () => {
+  const database = db({
+    quiz_nodes: (call) => call.upsert ? { error: new Error("write failed") } : { data: [{ id: "old-node" }] },
+    quiz_edges: { data: [] },
+  });
+  const queries = loader()("src/lib/supabase/queries.ts");
+  await assert.rejects(queries.saveFlow(database, QUIZ, [{ ...baseNode, position: { x: 0, y: 0 } }], []), /write failed/);
+  assert.ok(database.calls.every((c) => !c.delete));
+});
+test("flow saves remove only obsolete rows after successful replacement writes", async () => {
+  const database = db({
+    quiz_nodes: (call) => call.select ? { data: [{ id: "old-node" }, { id: "question" }] } : { error: null },
+    quiz_edges: { data: [] },
+  });
+  const queries = loader()("src/lib/supabase/queries.ts");
+  await queries.saveFlow(database, QUIZ, [{ ...baseNode, position: { x: 0, y: 0 } }], []);
+  const deletion = database.calls.find((c) => c.delete);
+  assert.deepEqual(deletion.filters, [["quiz_id", QUIZ], ["in:id", ["old-node"]]]);
+  assert.ok(database.calls.findIndex((c) => c.upsert) < database.calls.indexOf(deletion));
+});
+test("invalid flow edges are rejected before any database operation", async () => {
+  const database = db();
+  const queries = loader()("src/lib/supabase/queries.ts");
+  await assert.rejects(queries.saveFlow(database, QUIZ, [], [{ id: "edge", source: "missing", target: "missing" }]));
+  assert.equal(database.calls.length, 0);
+});
+test("concurrent flow saves are serialized and a failed save does not poison the queue", async () => {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  let writes = 0;
+  const database = db({
+    quiz_nodes: (call) => {
+      if (!call.upsert) return { data: [] };
+      writes++;
+      return writes === 1 ? gate.then(() => ({ error: new Error("first failed") })) : { error: null };
+    },
+    quiz_edges: { data: [] },
+  });
+  const queries = loader()("src/lib/supabase/queries.ts");
+  const first = queries.saveFlow(database, QUIZ, [{ ...baseNode, position: { x: 0, y: 0 } }], []);
+  const second = queries.saveFlow(database, QUIZ, [{ ...baseNode, position: { x: 1, y: 0 } }], []);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(writes, 1);
+  release();
+  await assert.rejects(first, /first failed/);
+  await second;
+  assert.equal(writes, 2);
+});

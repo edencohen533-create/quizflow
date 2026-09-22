@@ -206,18 +206,48 @@ export async function deleteQuiz(supabase: SupabaseClient, quizId: string) {
   if (error) throw error;
 }
 
-export async function saveFlow(supabase: SupabaseClient, quizId: string, nodes: QuizNode[], edges: QuizEdge[]) {
-  await supabase.from("quiz_nodes").delete().eq("quiz_id", quizId);
-  await supabase.from("quiz_edges").delete().eq("quiz_id", quizId);
-  if (nodes.length) {
-    const { error } = await supabase.from("quiz_nodes").insert(nodes.map((n) => nodeToRow(quizId, n)));
+const flowSaves = new Map<string, Promise<void>>();
+export function saveFlow(supabase: SupabaseClient, quizId: string, nodes: QuizNode[], edges: QuizEdge[]): Promise<void> {
+  // Serialize saves from this editor so an older response cannot replace a newer
+  // graph. A cross-client transaction/version check is a database follow-up.
+  const snapshot = structuredClone({ nodes, edges });
+  const next = (flowSaves.get(quizId) ?? Promise.resolve()).catch(() => {}).then(async () => {
+    const nodeIds = new Set(snapshot.nodes.map((n) => n.id));
+    if (nodeIds.size !== snapshot.nodes.length || new Set(snapshot.edges.map((edge) => edge.id)).size !== snapshot.edges.length ||
+        snapshot.edges.some((edge) => !nodeIds.has(edge.source) || !nodeIds.has(edge.target))) throw new Error("התרשים מכיל חיבורים לא תקינים");
+    const [oldNodes, oldEdges] = await Promise.all([
+      supabase.from("quiz_nodes").select("id").eq("quiz_id", quizId),
+      supabase.from("quiz_edges").select("id").eq("quiz_id", quizId),
+    ]);
+    if (oldNodes.error) throw oldNodes.error;
+    if (oldEdges.error) throw oldEdges.error;
+    // Persist replacements BEFORE deleting obsolete rows; a failed insert must
+    // never leave a previously working quiz with every node deleted.
+    if (snapshot.nodes.length) {
+      const { error } = await supabase.from("quiz_nodes").upsert(snapshot.nodes.map((n) => nodeToRow(quizId, n)), { onConflict: "quiz_id,id" });
+      if (error) throw error;
+    }
+    if (snapshot.edges.length) {
+      const { error } = await supabase.from("quiz_edges").upsert(snapshot.edges.map((edge) => edgeToRow(quizId, edge)), { onConflict: "quiz_id,id" });
+      if (error) throw error;
+    }
+    const edgeIds = new Set(snapshot.edges.map((edge) => edge.id));
+    for (const [table, ids] of [
+      ["quiz_edges", (oldEdges.data ?? []).filter((row) => !edgeIds.has(row.id)).map((row) => row.id)],
+      ["quiz_nodes", (oldNodes.data ?? []).filter((row) => !nodeIds.has(row.id)).map((row) => row.id)],
+    ] as const) {
+      if (ids.length) {
+        const { error } = await supabase.from(table).delete().eq("quiz_id", quizId).in("id", ids);
+        if (error) throw error;
+      }
+    }
+    const { error } = await supabase.from("quizzes").update({ updated_at: new Date().toISOString() }).eq("id", quizId);
     if (error) throw error;
-  }
-  if (edges.length) {
-    const { error } = await supabase.from("quiz_edges").insert(edges.map((e) => edgeToRow(quizId, e)));
-    if (error) throw error;
-  }
-  await supabase.from("quizzes").update({ updated_at: new Date().toISOString() }).eq("id", quizId);
+  });
+  flowSaves.set(quizId, next);
+  const cleanup = () => { if (flowSaves.get(quizId) === next) flowSaves.delete(quizId); };
+  void next.then(cleanup, cleanup);
+  return next;
 }
 
 // ---------------- Leads ----------------

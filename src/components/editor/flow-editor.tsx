@@ -121,11 +121,13 @@ function FlowEditorInner({
   initialNodes,
   initialEdges,
   onSavedIndicator,
+  saveRef,
 }: {
   quizId: string;
   initialNodes: QuizNode[];
   initialEdges: QuizEdge[];
   onSavedIndicator: (label: string) => void;
+  saveRef?: { current: (() => Promise<void>) | null };
 }) {
   const supabase = useMemo(() => createClient(), []);
   const connectedIds = useMemo(() => computeConnected(initialNodes, initialEdges), [initialNodes, initialEdges]);
@@ -140,6 +142,8 @@ function FlowEditorInner({
   const redoStack = useRef<HistoryEntry[]>([]);
   const skipHistory = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveRevision = useRef(0);
+  const dirtyRef = useRef(false);
 
   const domainNodesRef = useRef<QuizNode[]>(initialNodes);
   const domainEdgesRef = useRef<QuizEdge[]>(initialEdges);
@@ -164,14 +168,61 @@ function FlowEditorInner({
       const { nodes: dn, edges: de } = toDomain(flowNodes, flowEdges);
       domainNodesRef.current = dn;
       domainEdgesRef.current = de;
+      dirtyRef.current = true;
+      const revision = ++saveRevision.current;
+      onSavedIndicator("שומר...");
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => {
-        saveFlowToSupabase(supabase, quizId, dn, de);
-        onSavedIndicator("נשמר לפני רגע");
+      saveTimer.current = setTimeout(async () => {
+        saveTimer.current = null;
+        try {
+          await saveFlowToSupabase(supabase, quizId, dn, de);
+          if (revision === saveRevision.current) {
+            dirtyRef.current = false;
+            onSavedIndicator("נשמר לפני רגע");
+          }
+        } catch {
+          if (revision === saveRevision.current) onSavedIndicator("השמירה נכשלה — השינויים לא נשמרו");
+        }
       }, 500);
     },
     [quizId, supabase, toDomain, onSavedIndicator]
   );
+
+  const flushSave = useCallback(async () => {
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+    if (!dirtyRef.current) return;
+    const revision = ++saveRevision.current;
+    onSavedIndicator("שומר...");
+    try {
+      await saveFlowToSupabase(supabase, quizId, domainNodesRef.current, domainEdgesRef.current);
+      if (revision === saveRevision.current) { dirtyRef.current = false; onSavedIndicator("נשמר לפני רגע"); }
+    } catch (error) {
+      onSavedIndicator("השמירה נכשלה — השינויים לא נשמרו");
+      throw error;
+    }
+  }, [supabase, quizId, onSavedIndicator]);
+
+  useEffect(() => {
+    if (saveRef) saveRef.current = flushSave;
+    return () => { if (saveRef?.current === flushSave) saveRef.current = null; };
+  }, [saveRef, flushSave]);
+
+  useEffect(() => {
+    const warnUnsaved = (event: BeforeUnloadEvent) => {
+      if (dirtyRef.current) { event.preventDefault(); event.returnValue = ""; }
+    };
+    window.addEventListener("beforeunload", warnUnsaved);
+    return () => {
+      window.removeEventListener("beforeunload", warnUnsaved);
+      if (saveTimer.current) {
+        clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+        void saveFlowToSupabase(supabase, quizId, domainNodesRef.current, domainEdgesRef.current).catch(() => {
+          onSavedIndicator("השמירה נכשלה — השינויים לא נשמרו");
+        });
+      }
+    };
+  }, [supabase, quizId, onSavedIndicator]);
 
   const pushHistory = useCallback(() => {
     if (skipHistory.current) return;
@@ -451,6 +502,7 @@ export function FlowEditor(props: {
   initialNodes: QuizNode[];
   initialEdges: QuizEdge[];
   onSavedIndicator: (label: string) => void;
+  saveRef?: { current: (() => Promise<void>) | null };
 }) {
   return (
     <ReactFlowProvider>
