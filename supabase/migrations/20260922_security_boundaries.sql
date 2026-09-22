@@ -1,5 +1,6 @@
 -- APPLY ONLY AFTER the signed quiz API application release is live.
--- NOT APPLIED by the agent: database-management access is required.
+-- Baseline verified present in production on 2026-09-22; see the QA report.
+-- Application of this file by the agent was unnecessary.
 -- No rows/objects are deleted. Existing anonymous tabs must reload.
 begin;
 
