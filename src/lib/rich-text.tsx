@@ -1,11 +1,25 @@
 import { ReactNode } from "react";
 
+// Authors commonly type a question as "...word ?" (space before the mark).
+// When that line is close to the bubble's width, the browser can wrap right
+// at that space and strand the "?" alone on its own line. Swapping the last
+// such space for a non-breaking one keeps it glued to the preceding word,
+// per line (so a manually multi-line message still wraps normally between
+// its own lines).
+function glueTrailingPunctuation(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => line.replace(/ +([?!:])\s*$/, " $1"))
+    .join("\n");
+}
+
 // Minimal inline markup an author can add from the editor's bold/link
 // buttons: **bold** and [label](url). Intentionally small — no italics,
 // lists, etc. — since that's all the toolbar exposes.
 const RICH_TEXT_REGEX = /\[([^\]]+)\]\(([^)\s]+)\)|\*\*([^*]+)\*\*/g;
 
-export function renderRichText(text: string): ReactNode {
+export function renderRichText(rawText: string): ReactNode {
+  const text = glueTrailingPunctuation(rawText);
   const nodes: ReactNode[] = [];
   let lastIndex = 0;
   let key = 0;

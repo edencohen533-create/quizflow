@@ -413,11 +413,11 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
 
             return (
               <div key={entry.id} className="flex justify-start">
-                <div ref={isActive ? activeNodeRef : undefined} className="flex flex-col items-end gap-1">
-                  <div className="flex items-end gap-2">
+                <div ref={isActive ? activeNodeRef : undefined} className="flex max-w-[85%] flex-col items-end gap-1">
+                  <div className="flex min-w-0 items-end gap-2">
                     <Avatar url={quiz.theme.avatarUrl} />
                     <div
-                      className="max-w-[85%] px-5 py-4 leading-relaxed"
+                      className="min-w-0 px-5 py-4 leading-relaxed"
                       style={{ background: PALETTE.bubbleBot, color: PALETTE.text, borderRadius: PALETTE.radius }}
                     >
                       <BotNodeContent node={node} params={paramValues} />
