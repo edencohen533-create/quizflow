@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Search, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { QuizSession, QuizSessionDisplayStatus, SESSION_STATUS_LABELS } from "@/lib/types";
 import { displaySessionStatus, timeAgoLabel } from "@/lib/quiz-session-status";
 
@@ -30,6 +37,7 @@ export function SessionList({
   onSelect: (id: string) => void;
 }) {
   const [filter, setFilter] = useState<"all" | QuizSessionDisplayStatus>("all");
+  const [quizFilter, setQuizFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   // re-render every few seconds so "live"/"abandoned" and relative times stay fresh
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -38,10 +46,15 @@ export function SessionList({
     return () => clearInterval(t);
   }, []);
 
+  const quizOptions = useMemo(() => {
+    return Array.from(new Set(sessions.map((s) => s.quizName).filter(Boolean))).sort((a, b) => a.localeCompare(b, "he"));
+  }, [sessions]);
+
   const filtered = useMemo(() => {
     return sessions.filter((s) => {
       const status = displaySessionStatus(s, nowMs);
       if (filter !== "all" && status !== filter) return false;
+      if (quizFilter !== "all" && s.quizName !== quizFilter) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         const haystack = `${s.name ?? ""} ${s.quizName} ${s.currentNodeTitle ?? ""}`.toLowerCase();
@@ -49,7 +62,7 @@ export function SessionList({
       }
       return true;
     });
-  }, [sessions, filter, search, nowMs]);
+  }, [sessions, filter, quizFilter, search, nowMs]);
 
   const liveCount = useMemo(() => sessions.filter((s) => displaySessionStatus(s, nowMs) === "live").length, [sessions, nowMs]);
 
@@ -71,6 +84,19 @@ export function SessionList({
             className="h-9 pr-8 text-sm"
           />
         </div>
+        <Select
+          value={quizFilter}
+          onValueChange={(v) => setQuizFilter(v ?? "all")}
+          items={{ all: "כל השאלונים", ...Object.fromEntries(quizOptions.map((q) => [q, q])) }}
+        >
+          <SelectTrigger className="mt-2 h-9 text-sm"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">כל השאלונים</SelectItem>
+            {quizOptions.map((q) => (
+              <SelectItem key={q} value={q}>{q}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {FILTERS.map((f) => (
             <button
