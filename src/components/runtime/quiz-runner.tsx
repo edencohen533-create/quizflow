@@ -253,6 +253,8 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
   }, []);
 
   useEffect(() => {
+    // Keep the welcome logo visible on the initial screen, including mobile.
+    if (entries.length === 1) return;
     // Land the new active question near the middle of the screen instead of
     // pinned to the very bottom, so it doesn't feel like it's hiding at the edge.
     if (activeNodeId && activeNodeRef.current) {
@@ -427,8 +429,11 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
               </div>
             );
             const controlsRow = isActive && (
-              <div key="controls" className="mt-4 self-start"
-                style={{ width: "calc(100% - 36px)", marginInlineStart: 36 }}>
+              <div
+                key="controls"
+                className="mt-4 self-start"
+                style={{ width: "calc(100% - 36px)", marginInlineStart: 36 }}
+              >
                 <NodeControls
                   node={node}
                   palette={PALETTE}
@@ -462,14 +467,16 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
         </div>
       </div>
 
-      {entries.length > 1 && <button
+      {entries.length > 1 && (
+      <button
         onClick={scrollToBottom}
         className="fixed bottom-6 left-1/2 flex size-11 -translate-x-1/2 items-center justify-center rounded-full bg-white shadow-lg"
         style={{ color: PALETTE.buttonText }}
         aria-label="גלול למטה"
       >
         <ChevronDown className="size-5" />
-      </button>}
+      </button>
+      )}
     </div>
   );
 }
