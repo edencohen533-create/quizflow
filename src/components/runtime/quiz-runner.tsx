@@ -411,37 +411,46 @@ export function QuizRunner({ quiz }: { quiz: Quiz }) {
             if (!node) return null;
             const isActive = entry.nodeId === activeNodeId;
 
-            const messageImageUrl = node.data.kind === "message" ? node.data.imageUrl : undefined;
+            const blockImageUrl =
+              node.data.kind === "message" ? node.data.imageUrl : node.data.kind === "question" ? node.data.imageUrl : undefined;
+            const imageBelow = node.data.kind === "question" && node.data.imagePosition === "below";
+            const imageCard = blockImageUrl && (
+              <div
+                key="image"
+                className={`w-full bg-white p-4 shadow-sm ${imageBelow ? "mt-3" : "mb-3"}`}
+                style={{ borderRadius: PALETTE.radius }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={blockImageUrl} alt="" className="max-h-56 w-full object-contain" />
+              </div>
+            );
+            const bubbleRow = (
+              <div key="bubble" className="flex min-w-0 items-end gap-2">
+                <Avatar url={quiz.theme.avatarUrl} />
+                <div
+                  className="min-w-0 px-5 py-4 leading-relaxed"
+                  style={{ background: PALETTE.bubbleBot, color: PALETTE.text, borderRadius: PALETTE.radius }}
+                >
+                  <BotNodeContent node={node} params={paramValues} />
+                  {isActive && (
+                    <div className="mt-4">
+                      <NodeControls
+                        node={node}
+                        palette={PALETTE}
+                        leadInfo={leadInfo}
+                        onLeadInfoChange={(patch) => setLeadInfo((s) => ({ ...s, ...patch }))}
+                        onComplete={(text, handle, answer) => handleComplete(node, text, handle, answer)}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
 
             return (
               <div key={entry.id} className="flex justify-start">
                 <div ref={isActive ? activeNodeRef : undefined} className="flex max-w-[85%] flex-col items-end gap-1">
-                  {messageImageUrl && (
-                    <div className="mb-3 w-full bg-white p-4 shadow-sm" style={{ borderRadius: PALETTE.radius }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={messageImageUrl} alt="" className="max-h-56 w-full object-contain" />
-                    </div>
-                  )}
-                  <div className="flex min-w-0 items-end gap-2">
-                    <Avatar url={quiz.theme.avatarUrl} />
-                    <div
-                      className="min-w-0 px-5 py-4 leading-relaxed"
-                      style={{ background: PALETTE.bubbleBot, color: PALETTE.text, borderRadius: PALETTE.radius }}
-                    >
-                      <BotNodeContent node={node} params={paramValues} />
-                      {isActive && (
-                        <div className="mt-4">
-                          <NodeControls
-                            node={node}
-                            palette={PALETTE}
-                            leadInfo={leadInfo}
-                            onLeadInfoChange={(patch) => setLeadInfo((s) => ({ ...s, ...patch }))}
-                            onComplete={(text, handle, answer) => handleComplete(node, text, handle, answer)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  {imageBelow ? [bubbleRow, imageCard] : [imageCard, bubbleRow]}
                   <span className="px-1 text-xs" style={{ color: PALETTE.muted }}>{timeLabel(entry.ts)}</span>
                   {isActive && history.length > 1 && (
                     <button
@@ -479,16 +488,9 @@ function BotNodeContent({ node, params }: { node: QuizNode; params: Record<strin
     return <p className="whitespace-pre-line">{renderRichText(interpolateParams(node.data.text, params))}</p>;
   }
   if (node.data.kind === "question") {
-    const image = node.data.imageUrl && (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img key="image" src={node.data.imageUrl} alt="" className="w-full rounded-xl object-cover" />
-    );
-    const title = <p key="title" className="whitespace-pre-line">{renderRichText(interpolateParams(node.data.title, params))}</p>;
-    return (
-      <div className="space-y-3">
-        {node.data.imagePosition === "below" ? [title, image] : [image, title]}
-      </div>
-    );
+    // the image (if any) renders as its own separate floating card, above
+    // or below this bubble per imagePosition — see the "bot" entry case.
+    return <p className="whitespace-pre-line">{renderRichText(interpolateParams(node.data.title, params))}</p>;
   }
   if (node.data.kind === "name") {
     return <p>{node.data.title}</p>;
