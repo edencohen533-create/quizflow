@@ -5,7 +5,6 @@ import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 // A fresh document drops cached dashboard responses after assurance/session changes.
 function reloadSessionPage(path: "/" | "/login") {
- // eslint-disable-next-line @next/next/no-location-assign-relative-destination
  window.location.assign(path);
 }
 export default function MfaPage(){

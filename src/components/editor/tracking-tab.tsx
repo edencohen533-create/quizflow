@@ -188,6 +188,7 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
   const [activity, setActivity] = useState<QuizTrackingActivity[]>([]);
 
   const [pixelId, setPixelId] = useState("");
+  const [testEventCode, setTestEventCode] = useState("");
   const [gtmId, setGtmId] = useState("");
   const [token, setToken] = useState("");
   const [showToken, setShowToken] = useState(false);
@@ -279,17 +280,23 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
   }
 
   async function handleTestConnection() {
+    if (!testEventCode.trim()) return;
     setTesting(true);
-    const res = await fetch("/api/tracking/test-meta", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ quizId: quiz.id }),
-    });
-    const data = await res.json();
-    setTesting(false);
-    if (data.ok) toast.success("החיבור תקין");
-    else toast.error(`הבדיקה נכשלה: ${data.error}`);
-    setSettings(await getTrackingSettings(supabase, quiz.id));
+    try {
+      const res = await fetch("/api/tracking/test-meta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quizId: quiz.id, testEventCode: testEventCode.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) toast.success("Meta אישרה קליטת אירוע הבדיקה");
+      else toast.error(data.error || "בדיקת Meta נכשלה");
+      setSettings(await getTrackingSettings(supabase, quiz.id));
+    } catch {
+      toast.error("לא ניתן להשלים את הבדיקה. נסו שוב.");
+    } finally {
+      setTesting(false);
+    }
   }
 
   async function handleSaveEvent(input: TrackingEventInput) {
@@ -370,8 +377,13 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
             <p className="text-xs text-muted-foreground">הטוקן נשמר בצד השרת בלבד ולא נשלח בחזרה לדפדפן לאחר השמירה.</p>
           </div>
 
+          <div className="space-y-1.5">
+            <Label htmlFor="meta-test-code" className="text-xs">קוד בדיקה מ־Meta Events Manager</Label>
+            <Input id="meta-test-code" dir="ltr" value={testEventCode} maxLength={100} onChange={(e) => setTestEventCode(e.target.value)} placeholder="TEST12345" />
+            <p className="text-xs text-muted-foreground">העתיקו את הקוד מלשונית Test Events. הקוד משמש לבדיקה זו בלבד.</p>
+          </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={handleTestConnection} disabled={testing}>
+            <Button variant="outline" size="sm" onClick={handleTestConnection} disabled={testing || !testEventCode.trim()}>
               {testing && <Loader2 className="size-3.5 animate-spin" />}
               בדוק את החיבור ל-Meta
             </Button>

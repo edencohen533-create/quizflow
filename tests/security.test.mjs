@@ -457,3 +457,22 @@ test("tracking document stays sandboxed at top level and rejects configuration i
  assert.ok(text.includes('const gtm=null'));
  assert.ok(text.includes('const pixel="123456"'));
 });
+
+test("Meta test requires a test code before reading server credentials",async()=>{
+ let touched=false;
+ const POST=loader({"@/lib/security/owner":{requireQuizOwner:async()=>({})},"@/lib/supabase/admin":{createAdminClient:()=>{touched=true;return db();}}})("src/app/api/tracking/test-meta/route.ts").POST;
+ assert.equal((await POST(request({quizId:QUIZ}))).status,400);
+ assert.equal(touched,false);
+});
+test("Meta test forwards the debug code and requires actual event acknowledgement",async()=>{
+ const original=globalThis.fetch;
+ try {
+  for(const received of [0,1]){
+   const database=db({quiz_tracking_settings:{data:{meta_pixel_id:"123456789"}},quiz_tracking_secrets:{data:{meta_access_token:"fixture-only"}}});
+   globalThis.fetch=async(_url,options)=>{const payload=JSON.parse(options.body);assert.equal(payload.test_event_code,"TEST12345");assert.equal(payload.data[0].event_name,"TestEvent");return new Response(JSON.stringify({events_received:received}));};
+   const POST=loader({"@/lib/security/owner":{requireQuizOwner:async()=>({})},"@/lib/supabase/admin":{createAdminClient:()=>database}})("src/app/api/tracking/test-meta/route.ts").POST;
+   const result=await (await POST(request({quizId:QUIZ,testEventCode:"TEST12345"}))).json();
+   assert.equal(result.ok,received===1);
+  }
+ } finally {globalThis.fetch=original;}
+});
