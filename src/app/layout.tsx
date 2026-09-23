@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import type { Metadata } from "next";
 import { Assistant } from "next/font/google";
 import "./globals.css";
@@ -13,7 +14,9 @@ export const metadata: Metadata = {
   description: "בניית שאלונים אינטראקטיביים ליצירת לידים",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Nonces must be generated per request, never baked into static HTML.
+  await connection();
   return (
     <html lang="he" dir="rtl" className={`${assistant.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">

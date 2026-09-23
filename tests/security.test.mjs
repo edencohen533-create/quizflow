@@ -435,3 +435,25 @@ test("Meta delivery requires a positive provider acknowledgement, not just HTTP 
   }
  } finally {globalThis.fetch=original;}
 });
+
+test("page CSP restricts scripts to the fresh nonce and blocks inline handlers",()=>{
+ const {pageCsp}=loader()("src/lib/security/csp.ts");
+ const policy=pageCsp("randomNonceFixture123456",false);
+ const scripts=policy.split("; ").find(s=>s.startsWith("script-src "));
+ assert.match(scripts,/'nonce-randomNonceFixture123456'/);
+ assert.doesNotMatch(scripts,/unsafe-inline|unsafe-eval/);
+ assert.match(policy,/script-src-attr 'none'/);
+ assert.match(policy,/frame-ancestors 'self'/);
+ assert.match(pageCsp("randomNonceFixture654321",true),/frame-ancestors \*/);
+ assert.throws(()=>pageCsp("injected'; script-src *",true));
+});
+test("tracking document stays sandboxed at top level and rejects configuration injection",async()=>{
+ const {GET}=loader()("src/app/api/tracking/sandbox/route.ts");
+ const r=GET(new Request("https://quiz.example/api/tracking/sandbox?gtm="+encodeURIComponent('</script><script>alert(1)</script>')+"&pixel=123456"));
+ assert.match(r.headers.get("content-security-policy"),/^sandbox allow-scripts;/);
+ assert.doesNotMatch(r.headers.get("content-security-policy"),/allow-same-origin|allow-top-navigation|allow-forms/);
+ const text=await r.text();
+ assert.doesNotMatch(text,/alert\(1\)/);
+ assert.ok(text.includes('const gtm=null'));
+ assert.ok(text.includes('const pixel="123456"'));
+});
