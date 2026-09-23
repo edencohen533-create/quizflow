@@ -755,3 +755,13 @@ test("tracking event updates can clear conditions and value and retain TikTok de
  assert.equal(row.send_to_tiktok,true);
  assert.equal(row.condition_field,null);assert.equal(row.condition_operator,null);assert.equal(row.condition_value,null);assert.equal(row.value,null);
 });
+
+test("TikTok readiness completes when SDK is ready or bounded timeout expires",async t=>{
+ const oldWindow=global.window;
+ global.window={ttq:{_i:{C1234567890123456789:[]},instance:()=>({ready:callback=>callback()})}};
+ t.after(()=>{if(oldWindow===undefined)delete global.window;else global.window=oldWindow;});
+ const {waitForTikTokPixels}=loader()("src/lib/tiktok-pixel.ts");
+ await waitForTikTokPixels(["C1234567890123456789"],5);
+ window.ttq.instance=()=>({ready:()=>{}});
+ await waitForTikTokPixels(["C1234567890123456789"],5);
+});

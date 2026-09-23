@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/client";
 import { recordAnalyticsEvent, submitPublicQuizResponse } from "@/lib/supabase/queries";
 import { triggerIntegrations } from "@/lib/integrations";
 import { getTrackingSettings, listTrackingEvents } from "@/lib/supabase/tracking-queries";
-import { sendTikTokPixelEvent } from "@/lib/tiktok-pixel";
+import { sendTikTokPixelEvent, loadTikTokPixel, waitForTikTokPixels } from "@/lib/tiktok-pixel";
 import { fireTrackingEvent } from "@/lib/tracking-runtime";
 import { QuizTrackingEvent, QuizTrackingSettings, QuizSessionAnswer } from "@/lib/types";
 import { SunAvatar } from "@/components/runtime/sun-avatar";
@@ -121,6 +121,7 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
   const submittedRef = useRef(false);
   const advancingRef = useRef(false);
   const [submissionState, setSubmissionState] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+  const [trackingReady, setTrackingReady] = useState(!session);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const retryRef = useRef<(() => void) | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -247,23 +248,36 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
       fireEventsForTrigger(null);
     }
     let cancelled = false;
+    async function loadPixelIds(): Promise<{ tiktokPixelIds: string[] }> {
+      for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
+        try {
+          const response = await fetch("/api/tracking/pixels", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session!.token }, body: "{}", signal: AbortSignal.timeout(5000) });
+          if (!response.ok) throw new Error("Tracking configuration unavailable");
+          return await response.json();
+        } catch { if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 300 * (attempt + 1))); }
+      }
+      // A TikTok configuration outage must not prevent Meta/GTM delivery.
+      return { tiktokPixelIds: [] };
+    }
     async function loadTracking() {
       for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
         try {
           const [settings, events, pixels] = await Promise.all([
             getTrackingSettings(supabase, quiz.id),
             listTrackingEvents(supabase, quiz.id),
-            fetch("/api/tracking/pixels", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session!.token }, body: "{}", signal: AbortSignal.timeout(5000) }).then(async response => {
-              if (!response.ok) throw new Error("Tracking configuration unavailable");
-              return response.json() as Promise<{ tiktokPixelIds: string[] }>;
-            }),
+            loadPixelIds(),
           ]);
           if (cancelled) return;
           trackingRef.current = { settings, events, tiktokPixelIds: pixels.tiktokPixelIds ?? [] };
+          const enabledPixels = events.some(event => event.sendToTikTok) && !events.some(event => event.sendToTikTok && event.enabled) ? [] : trackingRef.current.tiktokPixelIds;
+          for (const id of enabledPixels) loadTikTokPixel(id);
           for (const entry of pendingTrackingRef.current.splice(0)) dispatchTracking(entry);
+          await waitForTikTokPixels(enabledPixels);
+          if (!cancelled) setTrackingReady(true);
           return;
         } catch { if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 300 * (attempt + 1))); }
       }
+      if (!cancelled) setTrackingReady(true);
     }
     void loadTracking();
     if (firstNode && firstNode.type !== "end") {
@@ -466,7 +480,7 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
             if (entry.kind === "result") {
               const node = nodesById.get(entry.nodeId);
               if (!node || node.data.kind !== "end") return null;
-              return <ResultCard key={entry.id} canRedirect={submissionState === "idle" || submissionState === "saved"} data={node.data} palette={PALETTE} avatarUrl={quiz.theme.avatarUrl} params={paramValues} />;
+              return <ResultCard key={entry.id} canRedirect={trackingReady && (submissionState === "idle" || submissionState === "saved")} data={node.data} palette={PALETTE} avatarUrl={quiz.theme.avatarUrl} params={paramValues} />;
             }
 
             const node = nodesById.get(entry.nodeId);

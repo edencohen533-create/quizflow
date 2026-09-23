@@ -1,4 +1,4 @@
-type TikTokInstance = unknown[][] & { page: (...args: unknown[]) => void; track: (...args: unknown[]) => void };
+type TikTokInstance = unknown[][] & { page: (...args: unknown[]) => void; track: (...args: unknown[]) => void; ready: (callback: () => void) => void };
 type TikTokQueue = unknown[][] & {
   methods: string[];
   setAndDefer: (target: unknown[][], method: string) => void;
@@ -60,4 +60,12 @@ export function sendTikTokPixelEvent(pixelId: string, eventName: string, paramet
   else instance.track(eventName, parameters, ...(eventId ? [{ event_id: eventId }] : []));
   if (key) sent.add(key);
   return true;
+}
+
+export async function waitForTikTokPixels(pixelIds: string[], timeoutMs = 1500): Promise<void> {
+  await Promise.all(pixelIds.map(id => new Promise<void>(resolve => {
+    if (!loadTikTokPixel(id)) { resolve(); return; }
+    const timer = setTimeout(resolve, timeoutMs);
+    window.ttq!.instance(id).ready(() => { clearTimeout(timer); resolve(); });
+  })));
 }
