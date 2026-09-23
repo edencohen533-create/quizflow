@@ -7,6 +7,7 @@ import { getImageProps } from "next/image";
 import { isStoredQuizImage } from "@/lib/quiz-images";
 import { ChevronDown, ArrowLeft } from "lucide-react";
 import { Quiz, QuizNode, QuizTheme, LeadAnswer } from "@/lib/types";
+import { freeformAnswerError } from "@/lib/answer-validation";
 import { getStartNode, resolveRenderable, isValidIsraeliPhone } from "@/lib/quiz-runtime";
 import { createClient } from "@/lib/supabase/client";
 import { recordAnalyticsEvent, submitPublicQuizResponse } from "@/lib/supabase/queries";
@@ -716,7 +717,9 @@ function NodeControls({
     }
 
     const submitFreeform = () => {
-      if (!text.trim() && data.required) return;
+      const validationError = freeformAnswerError(text, data.answerType, data.required);
+      if (validationError) { setError(validationError); return; }
+      setError(null);
       onComplete(text || "—", null, {
         nodeId: node.id,
         questionTitle: data.title,
@@ -750,7 +753,7 @@ function NodeControls({
             className="w-full rounded-lg py-3 text-sm font-semibold text-white disabled:opacity-50"
             style={{ background: PALETTE.buttonText }}
             onClick={submitFreeform}
-            disabled={!text}
+            disabled={data.required && !text}
           >
             המשך
           </button>
@@ -759,9 +762,12 @@ function NodeControls({
     }
 
     return (
-      <div className="space-y-2">
+      <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); submitFreeform(); }}>
         {data.answerType === "long_text" ? (
           <textarea
+            aria-label={data.title || "תשובה"}
+            required={data.required}
+            maxLength={4000}
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={3}
@@ -770,6 +776,11 @@ function NodeControls({
           />
         ) : (
           <input
+            aria-label={data.title || "תשובה"}
+            required={data.required}
+            maxLength={4000}
+            step={data.answerType === "number" ? "any" : undefined}
+            onKeyDown={(event) => { if (event.key === "Enter" && event.nativeEvent.isComposing) event.preventDefault(); }}
             type={data.answerType === "number" ? "number" : data.answerType === "date" ? "date" : "text"}
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -777,14 +788,15 @@ function NodeControls({
             style={{ borderColor: PALETTE.buttonBorder }}
           />
         )}
+        {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
         <button
+          type="submit"
           className="w-full rounded-lg py-3 text-sm font-semibold text-white"
           style={{ background: PALETTE.buttonText }}
-          onClick={submitFreeform}
         >
           המשך
         </button>
-      </div>
+      </form>
     );
   }
 

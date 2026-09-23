@@ -245,7 +245,7 @@ test("session IDs cannot be swapped; stale heartbeats cannot reopen completed se
   const POST = publicRoute("src/app/api/quiz-sessions/track/route.ts", database);
   const bad = await POST(request({ quizId: QUIZ, sessionId: "other" }));
   assert.equal(bad.status, 403); assert.equal(database.calls.length, 0);
-  const good = await POST(request({ quizId: QUIZ, sessionId: claims.sessionId, currentNodeId: "end", status: "completed", answers: [] }));
+  const good = await POST(request({ quizId: QUIZ, sessionId: claims.sessionId, currentNodeId: "end", status: "completed", answers: [{ nodeId: "question", optionIds: ["option"], answerLabel: "Trusted label" }] }));
   assert.equal(good.status, 200);
   assert.ok(database.calls[1].filters.some(([key, value]) => key === "not:status" && value === "completed"));
 });
@@ -650,4 +650,55 @@ test("publication checks the empty multi-choice path and both condition/AB branc
   assert.ok(validatePublishableFlow({ nodes: [start, condition, end], edges: [{ source: "s", target: "q" }] }).length);
   const ab = { id: "q", type: "ab_test", data: { kind: "ab_test", splitPercent: 50 } };
   assert.ok(validatePublishableFlow({ nodes: [start, ab, end], edges: [{ source: "s", target: "q" }, { source: "q", sourceHandle: "a", target: "e" }] }).length);
+});
+
+test("freeform dates and required numbers reject invalid values before persistence", () => {
+  const normalize = loader()("src/lib/security/answers.ts").normalizeAnswers;
+  const node = type => ({ ...baseNode, data: { ...baseNode.data, answerType: type, required: true } });
+  for (const [type, values] of [["date", ["not-a-date", "2025-02-29", "2026-04-31", "0000-01-01", "—"]], ["number", ["—", "0x10", "Infinity", "1e999"]]]) {
+    for (const value of values) assert.throws(() => normalize([{ nodeId: "question", answerLabel: value }], [node(type)]), type + ": " + value);
+  }
+  for (const [type, value] of [["date", "2024-02-29"], ["number", "1.25"], ["number", "-2e3"]]) {
+    assert.equal(normalize([{ nodeId: "question", answerLabel: value }], [node(type)])[0].answerLabel, value);
+  }
+});
+
+test("optional numeric date and rating skips are accepted without adding score", () => {
+  const normalize = loader()("src/lib/security/answers.ts").normalizeAnswers;
+  for (const answerType of ["number", "date", "rating"]) {
+    const node = { ...baseNode, data: { ...baseNode.data, answerType, required: false } };
+    for (const answerLabel of ["", "—", " — "]) assert.equal(normalize([{ nodeId: "question", answerLabel }], [node])[0].score, 0);
+  }
+});
+
+test("name answers share the visible field length limit", () => {
+  const node = { id: "name", type: "name", data: { kind: "name", title: "Name", required: true } };
+  const normalize = loader()("src/lib/security/answers.ts").normalizeAnswers;
+  assert.equal(normalize([{ nodeId: "name", answerLabel: "a".repeat(200) }], [node])[0].answerLabel.length, 200);
+  assert.throws(() => normalize([{ nodeId: "name", answerLabel: "a".repeat(201) }], [node]));
+});
+
+test("session completion rejects skipped required answers and unreachable endings without writes", async () => {
+  const valid = [{ nodeId: "question", optionIds: ["option"], answerLabel: "Trusted label" }];
+  for (const [currentNodeId, submitted] of [["end", []], ["other-end", valid], ["question", valid]]) {
+    const database = db();
+    const current = { ...quiz, nodes: [...quiz.nodes, { id: "other-end", type: "end", data: { kind: "end" } }] };
+    const POST = publicRoute("src/app/api/quiz-sessions/track/route.ts", database, {
+      "@/lib/security/public-quiz": { requirePublicQuiz: async () => ({ quiz: current, session: claims, admin: database }) }
+    });
+    const response = await POST(request({ quizId: QUIZ, sessionId: claims.sessionId, currentNodeId, status: "completed", answers: submitted }));
+    assert.equal(response.status, 400);
+    assert.equal(database.calls.length, 0);
+  }
+});
+
+test("session completion accepts a reached redirect and stores completed status", async () => {
+  const database = db();
+  const current = { ...quiz, nodes: quiz.nodes.map(n => n.id === "end" ? { id: "end", type: "action", data: { kind: "action", actionKind: "redirect", redirectUrl: "https://example.com" } } : n) };
+  const POST = publicRoute("src/app/api/quiz-sessions/track/route.ts", database, {
+    "@/lib/security/public-quiz": { requirePublicQuiz: async () => ({ quiz: current, session: claims, admin: database }) }
+  });
+  const response = await POST(request({ quizId: QUIZ, sessionId: claims.sessionId, currentNodeId: "end", status: "completed", answers: [{ nodeId: "question", optionIds: ["option"], answerLabel: "Trusted label" }] }));
+  assert.equal(response.status, 200);
+  assert.equal(database.calls[1].update.status, "completed");
 });

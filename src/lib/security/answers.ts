@@ -1,4 +1,5 @@
 import type { LeadAnswer, QuizNode } from "@/lib/types";
+import { freeformAnswerError } from "@/lib/answer-validation";
 import { HttpError, isRecord, stringField } from "./http";
 
 export function normalizeAnswers(input: unknown, nodes: QuizNode[]): LeadAnswer[] {
@@ -11,7 +12,7 @@ export function normalizeAnswers(input: unknown, nodes: QuizNode[]): LeadAnswer[
     if (!node || seen.has(nodeId) || (node.data.kind !== "question" && node.data.kind !== "name")) throw new HttpError(400, "Invalid answer node");
     seen.add(nodeId);
     const data = node.data;
-    let answerLabel = stringField(answer.answerLabel, 4000, data.required);
+    let answerLabel = stringField(answer.answerLabel, data.kind === "name" ? 200 : 4000, data.required);
     let score = 0;
     let optionIds: string[] | undefined;
     if (data.kind === "question") {
@@ -27,11 +28,10 @@ export function normalizeAnswers(input: unknown, nodes: QuizNode[]): LeadAnswer[
         const selected = data.options.filter((option) => chosenIds.has(option.id));
         answerLabel = selected.map((o) => o!.label).join(", ") || "—";
         score = selected.reduce((sum, o) => sum + o!.score, 0);
-      } else if (data.answerType === "rating") {
-        score = Number(answerLabel);
-        if (!Number.isInteger(score) || score < 1 || score > 10) throw new HttpError(400, "Invalid rating");
-      } else if (data.answerType === "number" && answerLabel !== "—" && !Number.isFinite(Number(answerLabel))) {
-        throw new HttpError(400, "Invalid number");
+      } else {
+        const error = freeformAnswerError(answerLabel, data.answerType, data.required);
+        if (error) throw new HttpError(400, error);
+        if (data.answerType === "rating" && answerLabel.trim() && answerLabel.trim() !== "—") score = Number(answerLabel);
       }
     }
     if (!Number.isSafeInteger(score) || Math.abs(score) > 100000) throw new HttpError(400, "Invalid score");
