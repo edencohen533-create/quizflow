@@ -111,7 +111,8 @@ interface LeadInfoState {
 
 export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSession }) {
   const supabase = useMemo(() => createClient(), []);
-  const nodesById = useMemo(() => new Map(quiz.nodes.map((node): [string, QuizNode] => [node.id, node.data.kind==="action" && node.data.actionKind==="redirect" ? {...node,type:"end",data:{kind:"end",title:"ממשיכים...",text:"",redirectEnabled:true,redirectUrl:node.data.redirectUrl,redirectDelaySeconds:0}} : node])), [quiz.nodes]);
+  const [resolvedNodes, setResolvedNodes] = useState<Record<string, QuizNode>>({});
+  const nodesById = useMemo(() => new Map([...quiz.nodes.map((node): [string, QuizNode] => [node.id, node.data.kind==="action" && node.data.actionKind==="redirect" ? {...node,type:"end",data:{kind:"end",title:"ממשיכים...",text:"",redirectEnabled:true,redirectUrl:node.data.redirectUrl,redirectDelaySeconds:0}} : node]), ...Object.entries(resolvedNodes)]), [quiz.nodes, resolvedNodes]);
   const searchParams = useSearchParams();
   const utmSource = searchParams.get("utm_source") ?? undefined;
   const startedRef = useRef(false);
@@ -325,8 +326,9 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
     }
     const nextAnswers = answerForScore ? { ...answers, [answerForScore.nodeId]: answerForScore } : answers;
     const next = resolveRenderable(quiz, fromId, handle, {answers:nextAnswers,score:Object.values(nextAnswers).reduce((s,a)=>s+a.score,0),utmSource,sessionId:sessionIdRef.current});
-    if(next && !nodesById.has(next.id)) nodesById.set(next.id,next);
-    if(next?.data.kind==="end" && nodesById.get(next.id)?.data.kind==="action") nodesById.set(next.id,next);
+    if (next && (!nodesById.has(next.id) || (next.data.kind === "end" && nodesById.get(next.id)?.data.kind === "action"))) {
+      setResolvedNodes((previous) => ({ ...previous, [next.id]: next }));
+    }
     setActiveNodeId(null);
     if (!next) { advancingRef.current = false; setActiveNodeId(fromId); return; }
 
@@ -468,14 +470,14 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
                 <Avatar url={quiz.theme.avatarUrl} />
                 <div
                   className="w-fit min-w-0 max-w-[calc(100%-36px)] px-5 py-4 leading-[1.35] sm:px-6"
-                  style={{ width: isActive && node.data.kind === "name" ? 420 : undefined, background: PALETTE.bubbleBot, color: PALETTE.text, borderRadius: `${PALETTE.radius}px ${PALETTE.radius}px ${PALETTE.radius}px 2px`, overflowWrap: "anywhere" }}
+                  style={{ width: isActive && (node.data.kind === "name" || node.data.kind === "lead_details") ? 420 : undefined, background: PALETTE.bubbleBot, color: PALETTE.text, borderRadius: `${PALETTE.radius}px ${PALETTE.radius}px ${PALETTE.radius}px 2px`, overflowWrap: "anywhere" }}
                 >
                   <BotNodeContent node={node} params={paramValues} />
-                  {node.data.kind === "name" && controls}
+                  {(node.data.kind === "name" || node.data.kind === "lead_details") && controls}
                 </div>
               </div>
             );
-            const controlsRow = isActive && node.data.kind !== "name" && (
+            const controlsRow = isActive && node.data.kind !== "name" && node.data.kind !== "lead_details" && (
               <div
                 key="controls"
                 className="mt-4 self-start"
@@ -789,6 +791,10 @@ function NodeControls({
     const data = node.data;
 
     function handleSubmit() {
+      if (data.showEmail && data.requireEmail && !leadInfo.email.trim()) {
+        setError("יש להזין כתובת מייל");
+        return;
+      }
       if (data.showEmail && leadInfo.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(leadInfo.email)) {
         setError("כתובת אימייל לא תקינה");
         return;
@@ -805,53 +811,81 @@ function NodeControls({
       onComplete(leadInfo.name || "הפרטים נשלחו", null);
     }
 
+    const inputClass = "min-h-[58px] w-full rounded-[4px] border-2 bg-white px-4 py-3 text-right text-[length:inherit] outline-none placeholder:opacity-60 focus:ring-2 focus:ring-current/20";
+    const inputStyle = { borderColor: PALETTE.buttonText, color: PALETTE.text };
     return (
-      <div className="space-y-2.5">
+      <form className="mt-6 space-y-4" onSubmit={(event) => { event.preventDefault(); handleSubmit(); }}>
         {data.showName && (
-          <input
-            placeholder="שם מלא"
-            maxLength={200}
-            value={leadInfo.name}
-            onChange={(e) => onLeadInfoChange({ name: e.target.value })}
-            className="w-full rounded-lg border px-4 py-2.5 text-sm outline-none focus:ring-2"
-            style={{ borderColor: PALETTE.buttonBorder }}
-          />
-        )}
-        {data.showPhone && (
-          <input
-            placeholder="טלפון"
-            type="tel"
-            maxLength={40}
-            dir="ltr"
-            value={leadInfo.phone}
-            onChange={(e) => onLeadInfoChange({ phone: e.target.value })}
-            className="w-full rounded-lg border px-4 py-2.5 text-end text-sm outline-none focus:ring-2"
-            style={{ borderColor: PALETTE.buttonBorder }}
-          />
-        )}
-        {data.showEmail && (
-          <input
-            placeholder="אימייל"
-            type="email"
-            maxLength={254}
-            dir="ltr"
-            value={leadInfo.email}
-            onChange={(e) => onLeadInfoChange({ email: e.target.value })}
-            className="w-full rounded-lg border px-4 py-2.5 text-end text-sm outline-none focus:ring-2"
-            style={{ borderColor: PALETTE.buttonBorder }}
-          />
-        )}
-        {data.showConsent && (
-          <label className="flex items-start gap-2 text-xs cursor-pointer" style={{ color: PALETTE.muted }}>
-            <Checkbox checked={leadInfo.consent} onCheckedChange={(v) => onLeadInfoChange({ consent: !!v })} className="mt-0.5" />
-            {data.consentText}
+          <label className="block space-y-2">
+            <span className="block">שם מלא</span>
+            <input
+              autoComplete="name"
+              placeholder="מה השם שלך?"
+              maxLength={200}
+              value={leadInfo.name}
+              onChange={(event) => onLeadInfoChange({ name: event.target.value })}
+              className={inputClass}
+              style={inputStyle}
+            />
           </label>
         )}
-        {error && <p className="text-xs text-red-500">{error}</p>}
-        <button className="w-full rounded-lg py-3 text-sm font-semibold text-white" style={{ background: PALETTE.buttonText }} onClick={handleSubmit}>
-          שליחה
-        </button>
-      </div>
+        {data.showPhone && (
+          <label className="block w-1/2 min-w-[150px] max-w-full space-y-2">
+            <span className="block">טלפון{data.requirePhoneIL ? "*" : ""}</span>
+            <input
+              placeholder="מה הטלפון שלך?"
+              type="tel"
+              autoComplete="tel"
+              required={data.requirePhoneIL}
+              maxLength={40}
+              dir="ltr"
+              value={leadInfo.phone}
+              onChange={(event) => onLeadInfoChange({ phone: event.target.value })}
+              className={inputClass}
+              style={inputStyle}
+            />
+          </label>
+        )}
+        {data.showEmail && (
+          <label className="block space-y-2">
+            <span className="block">מייל{data.requireEmail ? "*" : ""}</span>
+            <input
+              placeholder="מה המייל שלך?"
+              type="email"
+              autoComplete="email"
+              required={data.requireEmail}
+              maxLength={254}
+              dir="ltr"
+              value={leadInfo.email}
+              onChange={(event) => onLeadInfoChange({ email: event.target.value })}
+              className={inputClass}
+              style={inputStyle}
+            />
+          </label>
+        )}
+        {data.showConsent && (
+          <div className="space-y-2">
+            <p>אישור שליחה*</p>
+            <label className="flex cursor-pointer items-center gap-3 leading-[1.4]" style={{ color: PALETTE.text }}>
+              <input
+                type="checkbox"
+                required
+                checked={leadInfo.consent}
+                onChange={(event) => onLeadInfoChange({ consent: event.target.checked })}
+                className="size-4 shrink-0"
+                style={{ accentColor: PALETTE.buttonText }}
+              />
+              <span>{data.consentText}</span>
+            </label>
+          </div>
+        )}
+        {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
+        <div className="flex justify-end pt-1">
+          <button type="submit" className="min-h-11 rounded-[4px] border bg-white px-4 py-2 text-[length:inherit] font-semibold" style={{ borderColor: PALETTE.buttonBorder, color: PALETTE.buttonText }}>
+            {data.buttonLabel || "שליחה"}
+          </button>
+        </div>
+      </form>
     );
   }
 
