@@ -1,3 +1,4 @@
+import { submissionPath } from "@/lib/security/submission-path";
 import { NextResponse } from "next/server";
 import { requirePublicQuiz } from "@/lib/security/public-quiz";
 import { securePost, HttpError, stringField } from "@/lib/security/http";
@@ -9,8 +10,11 @@ export const POST = securePost(async (req, body) => {
   const nodeId = stringField(body.currentNodeId, 128, true);
   const node = quiz.nodes.find((n) => n.id === nodeId);
   if (!node || !["active", "completed"].includes(String(body.status))) throw new HttpError(400, "Invalid step");
-  if (body.status === "completed" && node.type !== "end") throw new HttpError(400, "Invalid completion");
   const answers = normalizeAnswers(body.answers ?? [], quiz.nodes);
+  if (body.status === "completed") {
+    const path = submissionPath(quiz, answers, session.sessionId, stringField(body.utmSource, 256));
+    if (path.at(-1)?.id !== node.id) throw new HttpError(400, "Invalid completion");
+  }
   const score = answers.reduce((sum, a) => sum + a.score, 0);
   const now = new Date().toISOString();
   const row = {
