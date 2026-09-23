@@ -14,8 +14,7 @@ interface Claims {
   iat: number;
   exp: number;
 }
-function signingKey() {
-  const secret = process.env.QUIZ_SESSION_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+function signingKey(secret = process.env.QUIZ_SESSION_SECRET) {
   if (!secret || secret.length < 32) throw new HttpError(503, "Session service unavailable");
   // Domain-separated derived key; never send the key itself to the client.
   return createHmac("sha256", secret).update("quizflow/public-session/v1").digest();
@@ -32,9 +31,18 @@ export function verifyPublicSession(req: Request, now = Date.now()): Claims {
   if (!header?.startsWith("Bearer ") || header.length > 2048) throw new HttpError(401, "Session required");
   const parts = header.slice(7).split(".");
   if (parts.length !== 2 || !parts.every((p) => /^[A-Za-z0-9_-]+$/.test(p))) throw new HttpError(401, "Invalid session");
-  const expected = createHmac("sha256", signingKey()).update(parts[0]).digest();
   const supplied = Buffer.from(parts[1], "base64url");
-  if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) throw new HttpError(401, "Invalid session");
+  const keys = [signingKey()];
+  const previous = process.env.QUIZ_SESSION_PREVIOUS_SECRET;
+  const until = Date.parse(process.env.QUIZ_SESSION_PREVIOUS_VALID_UNTIL || "");
+  // Verification-only grace: new capabilities are always signed by the primary key.
+  // Expired/missing/invalid deadlines never enable the retired key.
+  if (previous && previous.length >= 32 && Number.isFinite(until) && now < until) keys.push(signingKey(previous));
+  const matches = keys.map(key => {
+    const expected = createHmac("sha256", key).update(parts[0]).digest();
+    return expected.length === supplied.length && timingSafeEqual(expected, supplied);
+  });
+  if (!matches.some(Boolean)) throw new HttpError(401, "Invalid session");
   let c: unknown;
   try { c = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8")); }
   catch { throw new HttpError(401, "Invalid session"); }

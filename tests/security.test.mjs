@@ -476,3 +476,27 @@ test("Meta test forwards the debug code and requires actual event acknowledgemen
   }
  } finally {globalThis.fetch=original;}
 });
+
+test("session key transition preserves active capabilities only during explicit grace",()=>{
+ const names=["QUIZ_SESSION_SECRET","QUIZ_SESSION_PREVIOUS_SECRET","QUIZ_SESSION_PREVIOUS_VALID_UNTIL"];
+ const old=Object.fromEntries(names.map(k=>[k,process.env[k]])),now=Date.now();
+ const auth=t=>request({}, {authorization:"Bearer "+t.token});
+ try{
+  process.env.QUIZ_SESSION_SECRET="old-dedicated-fixture-key-over-thirty-two-characters";
+  const previous=session.issuePublicSession(QUIZ,WORKSPACE,now);
+  process.env.QUIZ_SESSION_PREVIOUS_SECRET=process.env.QUIZ_SESSION_SECRET;
+  process.env.QUIZ_SESSION_SECRET="new-dedicated-fixture-key-over-thirty-two-characters";
+  process.env.QUIZ_SESSION_PREVIOUS_VALID_UNTIL=new Date(now+60000).toISOString();
+  assert.equal(session.verifyPublicSession(auth(previous),now+1000).quizId,QUIZ);
+  const current=session.issuePublicSession(QUIZ,WORKSPACE,now);
+  assert.equal(session.verifyPublicSession(auth(current),now+61000).quizId,QUIZ);
+  assert.throws(()=>session.verifyPublicSession(auth(previous),now+61000),/Invalid session/);
+  process.env.QUIZ_SESSION_PREVIOUS_VALID_UNTIL="invalid";
+  assert.throws(()=>session.verifyPublicSession(auth(previous),now+1000),/Invalid session/);
+ }finally{for(const key of names){if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];}}
+});
+test("database service key cannot silently replace a missing session signing secret",()=>{
+ const key=process.env.QUIZ_SESSION_SECRET,service=process.env.SUPABASE_SERVICE_ROLE_KEY;
+ try{delete process.env.QUIZ_SESSION_SECRET;process.env.SUPABASE_SERVICE_ROLE_KEY="database-only-secret-that-must-not-sign-visitors";assert.throws(()=>session.issuePublicSession(QUIZ,WORKSPACE),/unavailable/);}
+ finally{process.env.QUIZ_SESSION_SECRET=key;if(service===undefined)delete process.env.SUPABASE_SERVICE_ROLE_KEY;else process.env.SUPABASE_SERVICE_ROLE_KEY=service;}
+});
