@@ -1,3 +1,4 @@
+import { validatePublishableFlow } from "@/lib/quiz-runtime";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   Integration,
@@ -160,6 +161,12 @@ export async function updateQuizMeta(
   quizId: string,
   patch: Partial<{ name: string; description: string; status: QuizStatus; allowBack: boolean }>
 ) {
+  if (patch.status === "active") {
+    const current = await fetchQuizFull(supabase, quizId);
+    if (!current) throw new Error("השאלון לא נמצא");
+    const errors = validatePublishableFlow(current);
+    if (errors.length) throw new Error(errors.join("; "));
+  }
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined) row.name = patch.name;
   if (patch.description !== undefined) row.description = patch.description;
@@ -174,31 +181,40 @@ export async function updateQuizTheme(supabase: SupabaseClient, quizId: string, 
   if (error) throw error;
 }
 
-export async function duplicateQuiz(supabase: SupabaseClient, quiz: Quiz): Promise<Quiz> {
+export async function duplicateQuiz(supabase: SupabaseClient, summary: Quiz): Promise<Quiz> {
+  // List cards deliberately omit the flow. Always copy a fresh full snapshot.
+  const quiz = await fetchQuizFull(supabase, summary.id);
+  if (!quiz) throw new Error("השאלון המקורי לא נמצא");
   const { data: quizRow, error } = await supabase
     .from("quizzes")
     .insert({
       workspace_id: quiz.workspaceId,
       name: `${quiz.name} (עותק)`,
       description: quiz.description ?? null,
-      slug: `${quiz.slug}-copy-${Math.floor(Math.random() * 10000)}`,
+      slug: `${quiz.slug}-copy-${crypto.randomUUID()}`,
       status: "draft",
       allow_back: quiz.allowBack,
     })
     .select("*")
     .single();
   if (error) throw error;
-
-  if (quiz.nodes.length) await supabase.from("quiz_nodes").insert(quiz.nodes.map((n) => nodeToRow(quizRow.id, n)));
-  if (quiz.edges.length) await supabase.from("quiz_edges").insert(quiz.edges.map((e) => edgeToRow(quizRow.id, e)));
-  await supabase.from("quiz_themes").insert(themeToRow(quizRow.id, quiz.theme));
-
-  return quizRowToQuiz(
-    quizRow,
-    quiz.nodes.map((n) => nodeToRow(quizRow.id, n)),
-    quiz.edges.map((e) => edgeToRow(quizRow.id, e)),
-    themeToRow(quizRow.id, quiz.theme)
-  );
+  try {
+    const state = { revision: quizRow.flow_revision ?? 0 };
+    await saveFlow(supabase, quizRow.id, quiz.nodes, quiz.edges, state);
+    const { error: themeError } = await supabase.from("quiz_themes").insert(themeToRow(quizRow.id, quiz.theme));
+    if (themeError) throw themeError;
+    return quizRowToQuiz(
+      { ...quizRow, flow_revision: state.revision },
+      quiz.nodes.map((n) => nodeToRow(quizRow.id, n)),
+      quiz.edges.map((e) => edgeToRow(quizRow.id, e)),
+      themeToRow(quizRow.id, quiz.theme)
+    );
+  } catch (copyError) {
+    // Only the newly allocated draft is removed; the source is never modified.
+    const { error: cleanupError } = await supabase.from("quizzes").delete().eq("id", quizRow.id);
+    if (cleanupError) throw new Error("השכפול נכשל. נותרה טיוטה חלקית שיש למחוק לפני ניסיון נוסף.");
+    throw copyError;
+  }
 }
 
 export async function deleteQuiz(supabase: SupabaseClient, quizId: string) {

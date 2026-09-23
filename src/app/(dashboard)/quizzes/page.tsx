@@ -1,6 +1,7 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -46,6 +47,9 @@ function QuizzesPageInner() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [leads, setLeads] = useState<{ quizId: string; createdAt: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
 
   const [dialogOpen, setDialogOpen] = useState(searchParams.get("new") === "1");
   const [query, setQuery] = useState("");
@@ -54,10 +58,13 @@ function QuizzesPageInner() {
 
   const load = useCallback(async () => {
     if (!workspaceId) return;
-    const [q, l] = await Promise.all([listQuizzes(supabase, workspaceId), listLeadCounts(supabase, workspaceId)]);
-    setQuizzes(q);
-    setLeads(l);
-    setLoading(false);
+    try {
+      const [q, l] = await Promise.all([listQuizzes(supabase, workspaceId), listLeadCounts(supabase, workspaceId)]);
+      setQuizzes(q);
+      setLeads(l);
+      setLoadError(false);
+    } catch { setLoadError(true); }
+    finally { setLoading(false); }
   }, [supabase, workspaceId]);
 
   useEffect(() => {
@@ -86,28 +93,41 @@ function QuizzesPageInner() {
     }).length;
   }
 
+  async function runAction(action: () => Promise<void>, message: string) {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    try { await action(); }
+    catch (error) { toast.error(error instanceof Error ? error.message : message); }
+    finally { busyRef.current = false; setBusy(false); }
+  }
+
   async function handleDuplicate(quiz: Quiz) {
-    await duplicateQuiz(supabase, quiz);
-    load();
+    await runAction(async () => { await duplicateQuiz(supabase, quiz); await load(); }, "שכפול השאלון נכשל");
   }
 
   async function handleSeedDemo() {
     if (!workspaceId || seeding) return;
-    setSeeding(true);
-    await seedDemoQuiz(supabase, workspaceId);
-    setSeeding(false);
-    load();
+    await runAction(async () => {
+      setSeeding(true);
+      try { await seedDemoQuiz(supabase, workspaceId); await load(); }
+      finally { setSeeding(false); }
+    }, "יצירת שאלון ההדגמה נכשלה");
   }
 
   async function handleDelete(quizId: string) {
-    setQuizzes((qs) => qs.filter((q) => q.id !== quizId));
-    await deleteQuiz(supabase, quizId);
+    await runAction(async () => {
+      await deleteQuiz(supabase, quizId);
+      setQuizzes((qs) => qs.filter((q) => q.id !== quizId));
+    }, "מחיקת השאלון נכשלה");
   }
 
   async function handleToggleStatus(quizId: string, checked: boolean) {
-    const nextStatus: QuizStatus = checked ? "active" : "paused";
-    setQuizzes((qs) => qs.map((q) => (q.id === quizId ? { ...q, status: nextStatus } : q)));
-    await updateQuizMeta(supabase, quizId, { status: nextStatus });
+    await runAction(async () => {
+      const nextStatus: QuizStatus = checked ? "active" : "paused";
+      await updateQuizMeta(supabase, quizId, { status: nextStatus });
+      setQuizzes((qs) => qs.map((q) => q.id === quizId ? { ...q, status: nextStatus } : q));
+    }, "עדכון מצב השאלון נכשל");
   }
 
   if (loading) {
@@ -116,6 +136,10 @@ function QuizzesPageInner() {
         <Loader2 className="size-5 animate-spin" />
       </div>
     );
+  }
+
+  if (loadError) {
+    return <div className="p-8 space-y-3" role="alert"><p>לא ניתן לטעון את השאלונים</p><Button onClick={() => { setLoading(true); void load(); }}>נסה שוב</Button></div>;
   }
 
   return (
@@ -192,10 +216,10 @@ function QuizzesPageInner() {
                         }
                       />
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleDuplicate(quiz)}>
+                        <DropdownMenuItem disabled={busy} onClick={() => handleDuplicate(quiz)}>
                           <Copy className="size-4" /> שכפל
                         </DropdownMenuItem>
-                        <DropdownMenuItem variant="destructive" onClick={() => handleDelete(quiz.id)}>
+                        <DropdownMenuItem disabled={busy} variant="destructive" onClick={() => handleDelete(quiz.id)}>
                           <Trash2 className="size-4" /> מחק
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -228,6 +252,7 @@ function QuizzesPageInner() {
                   <div className="mt-auto flex items-center justify-between pt-2 border-t">
                     <div className="flex items-center gap-2">
                       <Switch
+                        disabled={busy}
                         checked={quiz.status === "active"}
                         onCheckedChange={(checked) => handleToggleStatus(quiz.id, checked)}
                       />

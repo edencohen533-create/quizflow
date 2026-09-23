@@ -156,3 +156,71 @@ test("image optimizer only receives this project's public media", () => {
   ]) assert.equal(isStoredQuizImage(src, origin), false, src);
   assert.equal(isStoredQuizImage(image, ""), false);
 });
+
+function mutationClient(source = quiz, fail = "") {
+  const calls = [];
+  return {
+    calls,
+    async rpc(name, args) { calls.push({ rpc: name, args }); return fail === "flow" ? { error: new Error("flow failed") } : { data: 1, error: null }; },
+    from(table) {
+      const call = { table, filters: [] }; calls.push(call);
+      const builder = {
+        select(value) { call.select = value; return builder; },
+        eq(key, value) { call.filters.push([key, value]); return builder; },
+        insert(value) { call.insert = value; return builder; },
+        update(value) { call.update = value; return builder; },
+        delete() { call.delete = true; return builder; },
+        maybeSingle() { return Promise.resolve({ data: source, error: null }); },
+        single() { return Promise.resolve({ data: { ...source, ...call.insert, id: "copy-id", flow_revision: 0 }, error: null }); },
+        then(resolve, reject) { return Promise.resolve({ data: null, error: fail === "theme" && table === "quiz_themes" ? new Error("theme failed") : null }).then(resolve, reject); },
+      };
+      return builder;
+    }
+  };
+}
+const completeSource = { ...quiz, quiz_nodes: [...quiz.quiz_nodes, { id: "question", type: "end", position_x: 0, position_y: 100, data: { kind: "end", title: "Copied ending" } }] };
+
+test("duplicate from a list summary fetches and copies the complete current flow", async () => {
+  const database = mutationClient(completeSource);
+  const copy = await queries.duplicateQuiz(database, { id: quiz.id, workspaceId: "stale", name: "stale", nodes: [], edges: [], theme: THEME_PRESETS.dark_premium });
+  const saved = database.calls.find(c => c.rpc === "save_quiz_flow");
+  assert.ok(saved);
+  assert.equal(saved.args.p_nodes.length, 2);
+  assert.equal(saved.args.p_edges.length, 1);
+  assert.equal(copy.nodes[1].data.title, "Copied ending");
+  assert.equal(copy.flowRevision, 1);
+  assert.equal(copy.name, "Quiz (עותק)");
+  assert.equal(copy.workspaceId, "workspace-1");
+  assert.equal(copy.status, "draft");
+  assert.equal(copy.theme.primaryColor, THEME_PRESETS.clean_light.primaryColor);
+});
+
+test("failed duplication removes only its new partial draft and reports failure", async () => {
+  for (const fail of ["flow", "theme"]) {
+    const database = mutationClient(completeSource, fail);
+    await assert.rejects(queries.duplicateQuiz(database, { id: quiz.id, name: quiz.name, slug: quiz.slug, workspaceId: quiz.workspace_id, nodes: [], edges: [], theme: THEME_PRESETS.clean_light }), /failed/);
+    const removed = database.calls.filter(c => c.delete);
+    assert.equal(removed.length, 1);
+    assert.equal(removed[0].table, "quizzes");
+    assert.deepEqual(removed[0].filters, [["id", "copy-id"]]);
+  }
+});
+
+test("missing duplication source creates nothing", async () => {
+  const database = mutationClient(null);
+  await assert.rejects(queries.duplicateQuiz(database, { id: "missing", nodes: [], edges: [], theme: THEME_PRESETS.clean_light }));
+  assert.equal(database.calls.some(c => c.insert || c.rpc), false);
+});
+
+test("activation checks full flow before writing while pause remains possible", async () => {
+  const broken = { ...completeSource, quiz_edges: [] };
+  const rejected = mutationClient(broken);
+  await assert.rejects(queries.updateQuizMeta(rejected, quiz.id, { status: "active" }));
+  assert.equal(rejected.calls.some(c => c.update), false);
+  const allowed = mutationClient(completeSource);
+  await queries.updateQuizMeta(allowed, quiz.id, { status: "active" });
+  assert.deepEqual(allowed.calls.find(c => c.update).update, { status: "active" });
+  const paused = mutationClient(broken);
+  await queries.updateQuizMeta(paused, quiz.id, { status: "paused" });
+  assert.deepEqual(paused.calls.find(c => c.update).update, { status: "paused" });
+});
