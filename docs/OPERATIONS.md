@@ -63,7 +63,7 @@ GitHub Dependabot alerts and automated security-fix PRs are enabled. Secret scan
 
 ## External availability monitor
 
-The prepared docs/availability-workflow.yml must be installed at .github/workflows/availability.yml after the GitHub connection receives workflow scope. It is NOT scheduled while stored under docs/. Once activated, it checks the login page, the published probiotic quiz and unauthenticated worker rejection every 30 minutes, with three attempts per check. It runs outside Vercel, opens one GitHub issue assigned to the repository owner on failure and closes that issue after recovery. No response bodies, session tokens or customer records are logged. It uses only the short-lived GitHub workflow token; no production service credential is copied into GitHub.
+.github/workflows/availability.yml checks the login page, the published probiotic quiz and unauthenticated worker rejection every 30 minutes, with three attempts per check. It runs outside Vercel, opens one GitHub issue assigned to the repository owner on failure and closes that issue after recovery. No response bodies, session tokens or customer records are logged. It uses only the short-lived GitHub workflow token; no production service credential is copied into GitHub.
 
 Enable email notifications for assigned issues and Actions failures in the owner's GitHub notification settings. Delivery to the owner's requested email address is not verified by creating a workflow. Verify a real notification before treating email alerting as operational.
 
