@@ -68,12 +68,6 @@ export function QuizEditorClient({ initialQuiz }: { initialQuiz: Quiz }) {
     if (!current) return;
     const flowErrors = validatePublishableFlow(current);
     if (flowErrors.length) { toast.error(flowErrors.join("; ")); return; }
-    const hasStart = current.nodes.some((n) => n.type === "start");
-    const hasEnd = current.nodes.some((n) => n.type === "end");
-    if (!hasStart || !hasEnd) {
-      toast.error("לא ניתן לפרסם: חסר צומת התחלה או סיום בזרימה");
-      return;
-    }
     await updateQuizMeta(supabase, quiz.id, { status: "active" });
     setQuiz({ ...current, status: "active" });
     toast.success("השאלון פורסם בהצלחה");

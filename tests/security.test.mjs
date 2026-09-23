@@ -595,3 +595,59 @@ test("required contact email is enforced on the server before any write", async 
     assert.equal(database.calls.length, required ? 0 : 1);
   }
 });
+
+test("multi-choice labels match the browser regardless of click order and preserve branch selection", () => {
+  const { normalizeAnswers } = loader()("src/lib/security/answers.ts");
+  const { resolveRenderable } = loader()("src/lib/quiz-runtime.ts");
+  const question = { id: "q", type: "question", data: { kind: "question", title: "Choose", required: true, answerType: "multi_choice", combineAnswers: true, options: [
+    { id: "a", label: "Alpha", score: 1 }, { id: "b", label: "Beta", score: 2 }
+  ] } };
+  const input = [{ nodeId: "q", optionIds: ["b", "a"], answerLabel: "Alpha, Beta" }];
+  const normalized = normalizeAnswers(input, [question])[0];
+  assert.equal(normalized.answerLabel, input[0].answerLabel);
+  assert.deepEqual(normalized.optionIds, ["b", "a"]);
+  assert.equal(normalized.score, 3);
+  const graph = { nodes: [question,
+    { id: "condition", type: "condition", data: { kind: "condition", rules: [{ id: "match", sourceField: "answer", answerNodeId: "q", operator: "eq", value: "Alpha, Beta", targetNodeId: "yes" }], elseNodeId: "no" } },
+    ...["yes", "no"].map(id => ({ id, type: "end", data: { kind: "end" } }))
+  ], edges: [{ source: "q", target: "condition" }] };
+  assert.equal(resolveRenderable(graph, "q", null, { answers: { q: normalized } }).id, "yes");
+  assert.throws(() => normalizeAnswers([{ ...input[0], optionIds: ["unknown"] }], [question]), /Unknown option/);
+});
+
+test("publication rejects dead ends, missing option destinations and reachable cycles", () => {
+  const { validatePublishableFlow } = loader()("src/lib/quiz-runtime.ts");
+  const start = { id: "s", type: "start", data: { kind: "start" } };
+  const end = { id: "e", type: "end", data: { kind: "end" } };
+  const message = { id: "m", type: "message", data: { kind: "message" } };
+  assert.ok(validatePublishableFlow({ nodes: [start, message, end], edges: [{ source: "s", target: "m" }] }).length);
+  assert.ok(validatePublishableFlow({ nodes: [start, message, end], edges: [{ source: "s", target: "m" }, { source: "m", target: "m" }] }).length);
+  const question = { id: "q", type: "question", data: { kind: "question", answerType: "single_choice", combineAnswers: false, options: [{ id: "a", nextNodeId: "e" }, { id: "b", nextNodeId: "missing" }] } };
+  assert.ok(validatePublishableFlow({ nodes: [start, question, end], edges: [{ source: "s", target: "q" }] }).length);
+  question.data.options[1].nextNodeId = "e";
+  assert.deepEqual(validatePublishableFlow({ nodes: [start, question, end], edges: [{ source: "s", target: "q" }] }), []);
+});
+
+test("publication supports redirect endings and ignores disconnected drafts and terminal edges", () => {
+  const { validatePublishableFlow } = loader()("src/lib/quiz-runtime.ts");
+  const start = { id: "s", type: "start", data: { kind: "start" } };
+  const redirect = { id: "r", type: "action", data: { kind: "action", actionKind: "redirect", redirectUrl: "https://example.com/result" } };
+  assert.deepEqual(validatePublishableFlow({ nodes: [start, redirect, { id: "draft", type: "question", data: { kind: "question", options: [] } }], edges: [{ source: "s", target: "r" }] }), []);
+  const end = { id: "e", type: "end", data: { kind: "end" } };
+  assert.deepEqual(validatePublishableFlow({ nodes: [start, end], edges: [{ source: "s", target: "e" }, { source: "e", target: "s" }] }), []);
+});
+
+test("publication checks the empty multi-choice path and both condition/AB branches", () => {
+  const { validatePublishableFlow } = loader()("src/lib/quiz-runtime.ts");
+  const start = { id: "s", type: "start", data: { kind: "start" } };
+  const end = { id: "e", type: "end", data: { kind: "end" } };
+  const q = { id: "q", type: "question", data: { kind: "question", answerType: "multi_choice", required: false, combineAnswers: false, options: [{ id: "a", nextNodeId: "e" }] } };
+  const graph = { nodes: [start, q, end], edges: [{ source: "s", target: "q" }] };
+  assert.ok(validatePublishableFlow(graph).length);
+  graph.edges.push({ source: "q", target: "e" });
+  assert.deepEqual(validatePublishableFlow(graph), []);
+  const condition = { id: "q", type: "condition", data: { kind: "condition", rules: [{ id: "rule", sourceField: "score", operator: "gt", value: "0", targetNodeId: "e" }] } };
+  assert.ok(validatePublishableFlow({ nodes: [start, condition, end], edges: [{ source: "s", target: "q" }] }).length);
+  const ab = { id: "q", type: "ab_test", data: { kind: "ab_test", splitPercent: 50 } };
+  assert.ok(validatePublishableFlow({ nodes: [start, ab, end], edges: [{ source: "s", target: "q" }, { source: "q", sourceHandle: "a", target: "e" }] }).length);
+});

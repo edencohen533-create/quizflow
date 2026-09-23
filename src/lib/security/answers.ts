@@ -20,8 +20,11 @@ export function normalizeAnswers(input: unknown, nodes: QuizNode[]): LeadAnswer[
         optionIds = answer.optionIds as string[];
         if (new Set(optionIds).size !== optionIds.length || optionIds.length > data.options.length ||
             (data.required && !optionIds.length) || (data.answerType === "single_choice" && optionIds.length !== 1)) throw new HttpError(400, "Invalid options");
-        const selected = optionIds.map((id) => data.options.find((o) => o.id === id));
-        if (selected.some((o) => !o)) throw new HttpError(400, "Unknown option");
+        if (optionIds.some((id) => !data.options.some((option) => option.id === id))) throw new HttpError(400, "Unknown option");
+        // Match the displayed label order, while preserving click order in optionIds
+        // because the first selected option determines a branched continuation.
+        const chosenIds = new Set(optionIds);
+        const selected = data.options.filter((option) => chosenIds.has(option.id));
         answerLabel = selected.map((o) => o!.label).join(", ") || "—";
         score = selected.reduce((sum, o) => sum + o!.score, 0);
       } else if (data.answerType === "rating") {
