@@ -1,42 +1,9 @@
+import { sendMetaPixelEvent } from "@/lib/meta-pixel";
 import { sendSandboxTracking } from "@/lib/tracking-sandbox";
 import { QuizTrackingEvent, QuizTrackingSettings, TrackingCondition } from "@/lib/types";
 
-declare global {
-  interface Window {
-    fbq?: (...args: unknown[]) => void;
-    dataLayer?: unknown[];
-    _qfTrackingLoaded?: { pixel?: string; gtm?: string };
-  }
-}
-
 export function generateEventId(definitionId: string, sessionId: string) {
   return `${definitionId}-${sessionId}`;
-}
-
-function loadMetaPixelScript(pixelId: string) {
-  if (typeof window === "undefined") return;
-  window._qfTrackingLoaded = window._qfTrackingLoaded || {};
-  if (window._qfTrackingLoaded.pixel === pixelId) return;
-  window._qfTrackingLoaded.pixel = pixelId;
-  /* eslint-disable */
-  (function (f: any, b: any, e: any, v: any) {
-    if (f.fbq) return;
-    var n: any = (f.fbq = function () {
-      n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
-    });
-    if (!f._fbq) f._fbq = n;
-    n.push = n;
-    n.loaded = true;
-    n.version = "2.0";
-    n.queue = [];
-    var t = b.createElement(e);
-    t.async = true;
-    t.src = v;
-    var s = b.getElementsByTagName(e)[0];
-    s.parentNode.insertBefore(t, s);
-  })(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
-  /* eslint-enable */
-  window.fbq?.("init", pixelId);
 }
 
 function evaluateCondition(condition: TrackingCondition | undefined, context: Record<string, string | number | undefined>): boolean {
@@ -80,12 +47,10 @@ export function fireTrackingEvent(def: QuizTrackingEvent, ctx: FireContext) {
   const eventId = generateEventId(def.id, ctx.sessionId);
 
   if (def.sendToPixel && ctx.settings.metaPixelId) {
-    loadMetaPixelScript(ctx.settings.metaPixelId);
-    window.fbq?.(
-      "track",
-      eventName,
+    sendMetaPixelEvent(
+      ctx.settings.metaPixelId, eventName, def.name === "Custom",
       def.value != null ? { value: def.value, currency: def.currency || "ILS" } : {},
-      { eventID: eventId }
+      eventId,
     );
   }
 

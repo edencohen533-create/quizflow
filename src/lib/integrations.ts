@@ -1,3 +1,4 @@
+import { sendMetaPixelEvent } from "./meta-pixel";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Integration } from "./types";
 import { recordIntegrationResult } from "./supabase/queries";
@@ -8,32 +9,6 @@ declare global {
     ttq?: { load: (id: string) => void; page: () => void; track: (event: string, data?: unknown) => void };
     _qfPixelsLoaded?: Set<string>;
   }
-}
-
-function loadMetaPixel(pixelId: string) {
-  if (typeof window === "undefined") return;
-  window._qfPixelsLoaded = window._qfPixelsLoaded || new Set();
-  if (window._qfPixelsLoaded.has("meta:" + pixelId)) return;
-  window._qfPixelsLoaded.add("meta:" + pixelId);
-  /* eslint-disable */
-  (function (f: any, b: any, e: any, v: any) {
-    if (f.fbq) return;
-    var n: any = (f.fbq = function () {
-      n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
-    });
-    if (!f._fbq) f._fbq = n;
-    n.push = n;
-    n.loaded = true;
-    n.version = "2.0";
-    n.queue = [];
-    var t = b.createElement(e);
-    t.async = true;
-    t.src = v;
-    var s = b.getElementsByTagName(e)[0];
-    s.parentNode.insertBefore(t, s);
-  })(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
-  /* eslint-enable */
-  window.fbq?.("init", pixelId);
 }
 
 function loadTikTokPixel(pixelId: string) {
@@ -78,8 +53,7 @@ function loadTikTokPixel(pixelId: string) {
 }
 
 function fireMetaPixel(pixelId: string) {
-  loadMetaPixel(pixelId);
-  window.fbq?.("track", "Lead");
+  sendMetaPixelEvent(pixelId, "Lead", false);
 }
 
 function fireTikTokPixel(pixelId: string) {

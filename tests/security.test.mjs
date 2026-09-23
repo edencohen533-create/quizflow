@@ -500,3 +500,84 @@ test("database service key cannot silently replace a missing session signing sec
  try{delete process.env.QUIZ_SESSION_SECRET;process.env.SUPABASE_SERVICE_ROLE_KEY="database-only-secret-that-must-not-sign-visitors";assert.throws(()=>session.issuePublicSession(QUIZ,WORKSPACE),/unavailable/);}
  finally{process.env.QUIZ_SESSION_SECRET=key;if(service===undefined)delete process.env.SUPABASE_SERVICE_ROLE_KEY;else process.env.SUPABASE_SERVICE_ROLE_KEY=service;}
 });
+
+
+function pixelBrowser(t) {
+  const previousWindow = globalThis.window, previousDocument = globalThis.document;
+  const scripts = [];
+  globalThis.window = {};
+  globalThis.document = { createElement: () => ({}), head: { appendChild: script => scripts.push(script) } };
+  t.after(() => {
+    if (previousWindow === undefined) delete globalThis.window; else globalThis.window = previousWindow;
+    if (previousDocument === undefined) delete globalThis.document; else globalThis.document = previousDocument;
+  });
+  return { scripts, pixel: loader()("src/lib/meta-pixel.ts") };
+}
+
+test("pixel works with no server token and queues one initialization", t => {
+  const { scripts, pixel } = pixelBrowser(t);
+  pixel.sendMetaPixelEvent("123456", "PageView", false, {}, "page-session");
+  pixel.sendMetaPixelEvent("123456", "Lead", false, {}, "lead-session");
+  assert.equal(scripts.length, 1);
+  assert.deepEqual(window.fbq.queue, [
+    ["init", "123456"],
+    ["trackSingle", "123456", "PageView", {}, { eventID: "page-session" }],
+    ["trackSingle", "123456", "Lead", {}, { eventID: "lead-session" }],
+  ]);
+});
+test("custom events use the Meta custom command and keep deduplication ID", t => {
+  const { pixel } = pixelBrowser(t);
+  pixel.sendMetaPixelEvent("123456", "QuizStep", true, { value: 0, currency: "ILS" }, "step-session");
+  assert.deepEqual(window.fbq.queue[1], ["trackSingleCustom", "123456", "QuizStep", { value: 0, currency: "ILS" }, { eventID: "step-session" }]);
+});
+test("two pixels initialize once each and do not broadcast events", t => {
+  const { scripts, pixel } = pixelBrowser(t);
+  for (const id of ["123456", "654321", "123456"]) pixel.sendMetaPixelEvent(id, "Lead", false);
+  assert.equal(scripts.length, 1);
+  const calls = window.fbq.queue;
+  assert.equal(calls.filter(c => c[0] === "init").length, 2);
+  assert.deepEqual(calls.filter(c => c[0] === "trackSingle").map(c => c[1]), ["123456", "654321", "123456"]);
+  assert.equal(calls.some(c => c[0] === "track"), false);
+});
+test("existing Meta SDK is reused without replacing its callable", t => {
+  const { scripts, pixel } = pixelBrowser(t);
+  const calls = [];
+  const sdk = (...args) => calls.push(args);
+  window.fbq = sdk;
+  pixel.sendMetaPixelEvent("123456", "PageView", false);
+  assert.equal(window.fbq, sdk);
+  assert.equal(scripts.length, 0);
+  assert.equal(calls[1][0], "trackSingle");
+});
+test("invalid pixel identifiers never inject a script or send events", t => {
+  const { scripts, pixel } = pixelBrowser(t);
+  for (const id of ["", "1234", "9".repeat(31), "<script>", "123456x"]) {
+    pixel.sendMetaPixelEvent(id, "PageView", false);
+  }
+  assert.equal(scripts.length, 0);
+  assert.equal(window.fbq, undefined);
+});
+test("runtime pixel event does not require CAPI token and preserves custom event identity", t => {
+  pixelBrowser(t);
+  const calls = [];
+  const { fireTrackingEvent } = loader({
+    "@/lib/meta-pixel": { sendMetaPixelEvent: (...args) => calls.push(args) },
+    "@/lib/tracking-sandbox": { sendSandboxTracking: () => assert.fail("unexpected sandbox") },
+  })("src/lib/tracking-runtime.ts");
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = () => assert.fail("pixel-only configuration must not call CAPI");
+  t.after(() => { globalThis.fetch = originalFetch; });
+  fireTrackingEvent({ id: DEFINITION, name: "Custom", customName: "QuizStep", enabled: true, sendToPixel: true, sendToCapi: true }, {
+    sessionId: "browser-session", quizId: QUIZ, settings: { metaPixelId: "123456", metaHasToken: false },
+  });
+  assert.deepEqual(calls, [["123456", "QuizStep", true, {}, DEFINITION + "-browser-session"]]);
+});
+test("disabled or unmatched tracking definitions do not send pixels", () => {
+  const { fireTrackingEvent } = loader({
+    "@/lib/meta-pixel": { sendMetaPixelEvent: () => assert.fail("unexpected pixel") },
+    "@/lib/tracking-sandbox": { sendSandboxTracking: () => assert.fail("unexpected sandbox") },
+  })("src/lib/tracking-runtime.ts");
+  const ctx = { sessionId: "session", quizId: QUIZ, settings: { metaPixelId: "123456", metaHasToken: false } };
+  fireTrackingEvent({ enabled: false, sendToPixel: true }, ctx);
+  fireTrackingEvent({ enabled: true, sendToPixel: true, condition: { field: "answer", operator: "eq", value: "yes" } }, ctx);
+});
