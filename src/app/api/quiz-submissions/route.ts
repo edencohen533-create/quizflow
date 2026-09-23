@@ -22,6 +22,7 @@ export const POST = securePost(async (req, body) => {
   const detailNodes = path.filter((n) => n.data.kind === "lead_details").map((n) => n.data);
   for (const data of detailNodes) {
     if (data.kind !== "lead_details") continue;
+    if (data.showEmail && data.requireEmail && !email) throw new HttpError(400, "Email required");
     if (data.showConsent && lead.consent !== true) throw new HttpError(400, "Consent required");
     if (data.showPhone && data.requirePhoneIL && !isValidIsraeliPhone(phone)) throw new HttpError(400, "Invalid phone");
   }

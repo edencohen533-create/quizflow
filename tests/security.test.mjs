@@ -581,3 +581,17 @@ test("disabled or unmatched tracking definitions do not send pixels", () => {
   fireTrackingEvent({ enabled: false, sendToPixel: true }, ctx);
   fireTrackingEvent({ enabled: true, sendToPixel: true, condition: { field: "answer", operator: "eq", value: "yes" } }, ctx);
 });
+
+test("required contact email is enforced on the server before any write", async () => {
+  for (const required of [true, false]) {
+    const details = { id: "details", type: "lead_details", data: { kind: "lead_details", showEmail: true, requireEmail: required } };
+    const current = { ...quiz, nodes: [...quiz.nodes, details], edges: [{ source: "start", target: "question" }, { source: "question", target: "details" }, { source: "details", target: "end" }] };
+    const database = db();
+    const POST = publicRoute("src/app/api/quiz-submissions/route.ts", database, {
+      "@/lib/security/public-quiz": { requirePublicQuiz: async () => ({ quiz: current, session: claims, admin: database }) },
+    });
+    const response = await POST(request({ lead: { name: "Test" }, answers: [{ nodeId: "question", optionIds: ["option"], answerLabel: "label" }] }));
+    assert.equal(response.status, required ? 400 : 200);
+    assert.equal(database.calls.length, required ? 0 : 1);
+  }
+});
