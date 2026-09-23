@@ -419,6 +419,7 @@ export interface QuizTrackingEvent {
   customName?: string;
   triggerNodeId: string | null;
   sendToPixel: boolean;
+  sendToTikTok?: boolean;
   sendToCapi: boolean;
   sendToGtm: boolean;
   sendToCustomCode: boolean;

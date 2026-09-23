@@ -284,7 +284,7 @@ test("retired unauthenticated answer-write endpoint cannot write", async () => {
   const POST = load("src/app/api/save-answers/route.ts").POST;
   assert.equal((await POST(request({}))).status, 410);
 });
-for (const file of ["quiz-submissions", "quiz-sessions/track", "dispatch-integrations", "tracking/fire-capi", "analytics"]) {
+for (const file of ["quiz-submissions", "quiz-sessions/track", "dispatch-integrations", "tracking/fire-capi", "tracking/pixels", "analytics"]) {
   test(file + " rejects anonymous writes before accessing admin/database", async () => {
     let touched = false;
     const POST = loader({ "@/lib/supabase/admin": { createAdminClient: () => { touched = true; throw new Error("should not be used"); } } })("src/app/api/" + file + "/route.ts").POST;
@@ -701,4 +701,57 @@ test("session completion accepts a reached redirect and stores completed status"
   const response = await POST(request({ quizId: QUIZ, sessionId: claims.sessionId, currentNodeId: "end", status: "completed", answers: [{ nodeId: "question", optionIds: ["option"], answerLabel: "Trusted label" }] }));
   assert.equal(response.status, 200);
   assert.equal(database.calls[1].update.status, "completed");
+});
+
+test("TikTok queues scoped events, initializes once, and deduplicates event IDs", t => {
+  const oldWindow=global.window, oldDocument=global.document, scripts=[];
+  global.window={}; global.document={createElement:()=>({}),head:{appendChild:s=>scripts.push(s)}};
+  t.after(()=>{if(oldWindow===undefined)delete global.window;else global.window=oldWindow;if(oldDocument===undefined)delete global.document;else global.document=oldDocument;});
+  const {sendTikTokPixelEvent}=loader()("src/lib/tiktok-pixel.ts");
+  const a="C1234567890123456789",b="C9876543210987654321";
+  assert.equal(sendTikTokPixelEvent(a,"PageView",{},"page"),true);
+  sendTikTokPixelEvent(a,"PageView",{},"page");
+  sendTikTokPixelEvent(a,"Lead",{value:0,currency:"ILS"},"lead");
+  sendTikTokPixelEvent(a,"Lead",{value:0,currency:"ILS"},"lead");
+  sendTikTokPixelEvent(b,"QuizStep",{},"custom");
+  assert.equal(scripts.length,2);
+  assert.deepEqual(window.ttq._i[a].map(x=>x),[["page"],["track","Lead",{value:0,currency:"ILS"},{event_id:"lead"}]]);
+  assert.deepEqual(window.ttq._i[b].map(x=>x),[["track","QuizStep",{},{event_id:"custom"}]]);
+  assert.equal(sendTikTokPixelEvent("bad<script>","Lead"),false);
+  assert.equal(sendTikTokPixelEvent(a,"invalid event"),false);
+  assert.equal(scripts.length,2);
+});
+test("TikTok reuses an existing SDK without reloading or broadcasting",t=>{
+ const oldWindow=global.window,calls=[];
+ global.window={ttq:{_i:{C1234567890123456789:[]},load:()=>assert.fail("reloaded"),instance:id=>({track:(...args)=>calls.push([id,...args])})}};
+ t.after(()=>{if(oldWindow===undefined)delete global.window;else global.window=oldWindow;});
+ loader()("src/lib/tiktok-pixel.ts").sendTikTokPixelEvent("C1234567890123456789","Purchase",{value:9,currency:"USD"},"purchase");
+ assert.deepEqual(calls,[["C1234567890123456789","Purchase",{value:9,currency:"USD"},{event_id:"purchase"}]]);
+});
+test("TikTok destination respects conditions, disabled state, parameters and per-session dedupe",()=>{
+ const calls=[];
+ const {fireTrackingEvent}=loader({"@/lib/tiktok-pixel":{sendTikTokPixelEvent:(...args)=>calls.push(args)}})("src/lib/tracking-runtime.ts");
+ const def={id:"step",enabled:true,name:"Custom",customName:"QuizStep",sendToTikTok:true,value:0,currency:"ILS",condition:{field:"q",operator:"eq",value:"yes"}};
+ const ctx={sessionId:"session",settings:{},tiktokPixelIds:["C1234567890123456789"],sentEvents:new Set(),conditionContext:{q:"no"}};
+ fireTrackingEvent(def,ctx);assert.equal(calls.length,0);
+ ctx.conditionContext.q="yes";fireTrackingEvent(def,ctx);fireTrackingEvent(def,ctx);
+ assert.deepEqual(calls,[["C1234567890123456789","QuizStep",{value:0,currency:"ILS"},"step-session"]]);
+ fireTrackingEvent({...def,id:"disabled",enabled:false},ctx);assert.equal(calls.length,1);
+});
+test("public TikTok configuration is scoped and exposes only validated pixel IDs",async()=>{
+ const database=db({integrations:{data:[{pixel_id:"C1234567890123456789"},{pixel_id:"C1234567890123456789"},{pixel_id:"<script>"}]}});
+ const POST=publicRoute("src/app/api/tracking/pixels/route.ts",database);
+ const response=await POST(request({quizId:"forged"}));
+ assert.equal(response.status,200);
+ assert.deepEqual(await response.json(),{tiktokPixelIds:["C1234567890123456789"]});
+ assert.equal(database.calls[0].select,"pixel_id");
+ assert.deepEqual(database.calls[0].filters,[["quiz_id",QUIZ],["workspace_id",WORKSPACE],["kind","tiktok_pixel"],["enabled",true]]);
+});
+test("tracking event updates can clear conditions and value and retain TikTok destination",async()=>{
+ const database=db();
+ const {updateTrackingEvent}=loader()("src/lib/supabase/tracking-queries.ts");
+ await updateTrackingEvent(database,DEFINITION,{sendToTikTok:true,condition:null,value:null});
+ const row=database.calls[0].update;
+ assert.equal(row.send_to_tiktok,true);
+ assert.equal(row.condition_field,null);assert.equal(row.condition_operator,null);assert.equal(row.condition_value,null);assert.equal(row.value,null);
 });

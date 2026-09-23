@@ -1,5 +1,6 @@
 "use client";
 
+import { TIKTOK_PIXEL_ID } from "@/lib/tiktok-pixel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Eye, EyeOff, Loader2, CheckCircle2, XCircle, Plus, Pencil, Copy, Trash2, Target, Webhook as WebhookIcon, Music2, Zap } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,9 +40,10 @@ const PIXEL_ID_REGEX = /^\d{5,30}$/;
 function TRIGGER_LABEL(nodeId: string | null, quiz: Quiz) {
   if (nodeId === null) return "בטעינת השאלון";
   if (nodeId === "__lead_details__") return "לאחר השארת פרטים";
-  if (nodeId === "__end__") return "במסך הסיום";
+  if (nodeId === "__end__") return "בסיום השאלון (אחרי שמירה)";
+  if (nodeId === "__saved__") return "לאחר שמירה מוצלחת";
   const node = quiz.nodes.find((n) => n.id === nodeId);
-  if (node?.data.kind === "question") return node.data.title;
+  if (node?.data.kind === "question") return "לאחר תשובה: " + node.data.title;
   return nodeId;
 }
 
@@ -129,24 +131,27 @@ function TikTokPixelCard({
   const supabase = useMemo(() => createClient(), []);
   const [value, setValue] = useState(existing?.pixelId ?? "");
 
+  const [busy, setBusy] = useState(false);
+  async function change(action: () => Promise<void>) {
+    if (busy) return;
+    setBusy(true);
+    try { await action(); await onChanged(); }
+    catch { toast.error("שמירת TikTok נכשלה. נסו שוב."); }
+    finally { setBusy(false); }
+  }
   async function handleSave() {
-    if (!value.trim()) return;
-    if (existing) await updateIntegration(supabase, existing.id, { pixelId: value.trim(), enabled: true });
-    else await addIntegration(supabase, workspaceId, quizId, { kind: "tiktok_pixel", name: "TikTok Pixel", pixelId: value.trim() });
-    toast.success("TikTok Pixel נשמר ופעיל");
-    onChanged();
+    if (!TIKTOK_PIXEL_ID.test(value.trim())) { toast.error("יש להזין Pixel Code תקין מ־TikTok"); return; }
+    await change(async () => {
+      if (existing) await updateIntegration(supabase, existing.id, { pixelId: value.trim(), enabled: true });
+      else await addIntegration(supabase, workspaceId, quizId, { kind: "tiktok_pixel", name: "TikTok Pixel", pixelId: value.trim() });
+      toast.success("TikTok Pixel נשמר ופעיל");
+    });
   }
-
   async function handleToggle(checked: boolean) {
-    if (!existing) return;
-    await updateIntegration(supabase, existing.id, { enabled: checked });
-    onChanged();
+    if (existing) await change(() => updateIntegration(supabase, existing.id, { enabled: checked }));
   }
-
   async function handleDelete() {
-    if (!existing) return;
-    await deleteIntegration(supabase, existing.id);
-    onChanged();
+    if (existing) await change(() => deleteIntegration(supabase, existing.id));
   }
 
   return (
@@ -160,19 +165,19 @@ function TikTokPixelCard({
             <p className="font-medium text-sm">TikTok Pixel</p>
             {existing && (
               <div className="flex items-center gap-2">
-                <Switch checked={existing.enabled} onCheckedChange={handleToggle} />
-                <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={handleDelete}>
+                <Switch disabled={busy} aria-label="TikTok פעיל" checked={existing.enabled} onCheckedChange={handleToggle} />
+                <Button variant="ghost" size="icon" className="size-7 text-destructive" disabled={busy} onClick={handleDelete}>
                   <Trash2 className="size-3.5" />
                 </Button>
               </div>
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            שולח אירוע &quot;ליד&quot; אוטומטית לפיקסל בכל שליחת השאלון הזה, ישירות מדפדפן המשתמש.
+            אפשר להגדיר אירועי TikTok באזור האירועים למטה. עד להגדרה אישית נשלחים PageView וליד לאחר שמירה מוצלחת. הגדרה אישית מחליפה את האירועים האוטומטיים.
           </p>
           <div className="flex gap-2">
-            <Input dir="ltr" value={value} onChange={(e) => setValue(e.target.value)} placeholder="Pixel Code, לדוגמה CXXXXXXXXXXXXXXXXX" className="h-8 text-xs" />
-            <Button size="sm" onClick={handleSave} disabled={!value.trim()}>שמור</Button>
+            <Input aria-label="TikTok Pixel Code" dir="ltr" value={value} onChange={(e) => setValue(e.target.value)} placeholder="Pixel Code, לדוגמה CXXXXXXXXXXXXXXXXX" className="h-8 text-xs" />
+            <Button size="sm" onClick={handleSave} disabled={busy || !value.trim()}>שמור</Button>
           </div>
         </div>
       </CardContent>
@@ -197,6 +202,7 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
   const [savedLabel, setSavedLabel] = useState<string | null>(null);
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [eventTarget, setEventTarget] = useState<"meta" | "tiktok">("meta");
   const [editingEvent, setEditingEvent] = useState<QuizTrackingEvent | undefined>(undefined);
   const seedingRef = useRef(false);
 
@@ -341,7 +347,7 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
   return (
     <div className="p-6 space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold flex items-center gap-2"><Target className="size-4 text-emerald-600" /> מטה פיקסל ו-GTM</h2>
+        <h2 className="font-semibold flex items-center gap-2"><Target className="size-4 text-emerald-600" /> Meta, TikTok ו־GTM</h2>
         {savedLabel && <span className="text-xs text-muted-foreground">{savedLabel}</span>}
       </div>
 
@@ -445,6 +451,7 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
       </Card>
 
       <TikTokPixelCard
+        key={integrations.find((i) => i.kind === "tiktok_pixel")?.pixelId ?? "tiktok-new"}
         existing={integrations.find((i) => i.kind === "tiktok_pixel")}
         workspaceId={quiz.workspaceId}
         quizId={quiz.id}
@@ -454,9 +461,9 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">אירועי המרה לפי צעד</CardTitle>
-          <Button size="sm" onClick={() => { setEditingEvent(undefined); setDialogOpen(true); }}>
+          <div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => { setEventTarget("tiktok"); setEditingEvent(undefined); setDialogOpen(true); }}>הוסף אירוע TikTok</Button><Button size="sm" onClick={() => { setEventTarget("meta"); setEditingEvent(undefined); setDialogOpen(true); }}>
             <Plus className="size-4" /> הוסף אירוע
-          </Button>
+          </Button></div>
         </CardHeader>
         <CardContent className="space-y-2">
           {events.length === 0 ? (
@@ -470,6 +477,7 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
                     <span className="text-xs text-muted-foreground">· {TRIGGER_LABEL(ev.triggerNodeId, quiz)}</span>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
+                    {ev.sendToTikTok && <span className="rounded-full bg-muted px-2 py-0.5">TikTok</span>}
                     {ev.sendToPixel && <span className="rounded-full bg-muted px-2 py-0.5">Pixel</span>}
                     {ev.sendToCapi && <span className="rounded-full bg-muted px-2 py-0.5">CAPI</span>}
                     {ev.sendToGtm && <span className="rounded-full bg-muted px-2 py-0.5">GTM</span>}
@@ -509,6 +517,8 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
       )}
 
       <TrackingEventDialog
+        key={(editingEvent?.id ?? "new") + ":" + eventTarget + ":" + dialogOpen}
+        defaultTarget={eventTarget}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         nodes={quiz.nodes}

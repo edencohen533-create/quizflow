@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/client";
 import { recordAnalyticsEvent, submitPublicQuizResponse } from "@/lib/supabase/queries";
 import { triggerIntegrations } from "@/lib/integrations";
 import { getTrackingSettings, listTrackingEvents } from "@/lib/supabase/tracking-queries";
+import { sendTikTokPixelEvent } from "@/lib/tiktok-pixel";
 import { fireTrackingEvent } from "@/lib/tracking-runtime";
 import { QuizTrackingEvent, QuizTrackingSettings, QuizSessionAnswer } from "@/lib/types";
 import { SunAvatar } from "@/components/runtime/sun-avatar";
@@ -158,8 +159,10 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
   // Meta Pixel/CAPI + GTM tracking (separate from the quiz's own analytics/
   // integrations calls above — additive, doesn't affect existing behavior).
   const sessionIdRef = useRef<string>(session?.sessionId ?? crypto.randomUUID());
-  const trackingRef = useRef<{ settings: QuizTrackingSettings; events: QuizTrackingEvent[] } | null>(null);
+  const trackingRef = useRef<{ settings: QuizTrackingSettings; events: QuizTrackingEvent[]; tiktokPixelIds: string[] } | null>(null);
   const firedPageLoadRef = useRef(false);
+  const sentTrackingRef = useRef(new Set<string>());
+  const pendingTrackingRef = useRef<{ triggerKey: string | null; conditionContext: Record<string, string | number | undefined> }[]>([]);
   const leadInfoRef = useRef(leadInfo);
   useEffect(() => {
     leadInfoRef.current = leadInfo;
@@ -205,42 +208,68 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
     }).catch(() => {});
   }
 
-  function fireEventsForTrigger(triggerKey: string | null, answerForScore?: LeadAnswer) {
+  function dispatchTracking(entry: { triggerKey: string | null; conditionContext: Record<string, string | number | undefined> }) {
     const tracking = trackingRef.current;
-    if (!tracking) return;
-    const conditionContext: Record<string, string | number | undefined> = {};
-    if (answerForScore) conditionContext[answerForScore.nodeId] = answerForScore.answerLabel;
-    for (const ev of tracking.events) {
-      if (ev.triggerNodeId !== triggerKey) continue;
-      fireTrackingEvent(ev, {
-        sessionId: sessionIdRef.current,
-        sessionToken: session?.token,
-        quizId: quiz.id,
-        settings: tracking.settings,
-        phone: leadInfoRef.current.phone || undefined,
-        email: leadInfoRef.current.email || undefined,
-        conditionContext,
+    if (!tracking) { pendingTrackingRef.current.push(entry); return; }
+    // Existing TikTok integrations retain automatic page/lead tracking until
+    // an explicit TikTok event is configured (disabled definitions count too).
+    if (!tracking.events.some(event => event.sendToTikTok) && (entry.triggerKey === null || entry.triggerKey === "__saved__")) {
+      const name = entry.triggerKey === null ? "PageView" : "Lead";
+      for (const id of tracking.tiktokPixelIds) sendTikTokPixelEvent(id, name, {}, "legacy-" + name + "-" + sessionIdRef.current);
+    }
+    for (const event of tracking.events) {
+      if (event.triggerNodeId !== entry.triggerKey) continue;
+      fireTrackingEvent(event, {
+        sessionId: sessionIdRef.current, sessionToken: session?.token, quizId: quiz.id,
+        settings: tracking.settings, tiktokPixelIds: tracking.tiktokPixelIds,
+        sentEvents: sentTrackingRef.current,
+        phone: leadInfoRef.current.phone || undefined, email: leadInfoRef.current.email || undefined,
+        conditionContext: entry.conditionContext,
       });
     }
+  }
+
+  function fireEventsForTrigger(triggerKey: string | null, answer?: LeadAnswer, snapshot = answersRef.current) {
+    const current = answer ? { ...snapshot, [answer.nodeId]: answer } : snapshot;
+    const conditionContext: Record<string, string | number | undefined> = { score: Object.values(current).reduce((sum, value) => sum + value.score, 0) };
+    for (const value of Object.values(current)) {
+      conditionContext[value.nodeId] = value.answerLabel;
+      if (value.paramKey) conditionContext[value.paramKey] = value.answerLabel;
+    }
+    dispatchTracking({ triggerKey, conditionContext });
   }
 
   useEffect(() => {
     if (!session) return;
     recordAnalyticsEvent(supabase, quiz.id, "view", utmSource, session);
-    (async () => {
-      const [settings, events] = await Promise.all([
-        getTrackingSettings(supabase, quiz.id),
-        listTrackingEvents(supabase, quiz.id),
-      ]);
-      trackingRef.current = { settings, events };
-      if (!firedPageLoadRef.current) {
-        firedPageLoadRef.current = true;
-        fireEventsForTrigger(null);
+    if (!firedPageLoadRef.current) {
+      firedPageLoadRef.current = true;
+      fireEventsForTrigger(null);
+    }
+    let cancelled = false;
+    async function loadTracking() {
+      for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
+        try {
+          const [settings, events, pixels] = await Promise.all([
+            getTrackingSettings(supabase, quiz.id),
+            listTrackingEvents(supabase, quiz.id),
+            fetch("/api/tracking/pixels", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + session!.token }, body: "{}", signal: AbortSignal.timeout(5000) }).then(async response => {
+              if (!response.ok) throw new Error("Tracking configuration unavailable");
+              return response.json() as Promise<{ tiktokPixelIds: string[] }>;
+            }),
+          ]);
+          if (cancelled) return;
+          trackingRef.current = { settings, events, tiktokPixelIds: pixels.tiktokPixelIds ?? [] };
+          for (const entry of pendingTrackingRef.current.splice(0)) dispatchTracking(entry);
+          return;
+        } catch { if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 300 * (attempt + 1))); }
       }
-    })().catch(() => {});
+    }
+    void loadTracking();
     if (firstNode && firstNode.type !== "end") {
       pushSessionUpdate(firstNode, 0, "active", {}, 0);
     }
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -312,6 +341,8 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
     );
     recordAnalyticsEvent(supabase, quiz.id, "complete", utmSource, session);
     triggerIntegrations(leadId, session.token);
+    fireEventsForTrigger("__saved__", undefined, finalAnswers);
+    fireEventsForTrigger("__end__", undefined, finalAnswers);
     setSubmissionState("saved");
     } catch {
       submittedRef.current = false;
@@ -354,8 +385,8 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
         setHistory((h) => [...h, next.id]);
       }
       pushSessionUpdate(next, Object.keys(mergedAnswers).length, next.type === "end" ? "completed" : "active", mergedAnswers, mergedScore);
-      fireEventsForTrigger(next.id, answerForScore);
-      if (next.type === "end") fireEventsForTrigger("__end__", answerForScore);
+      if (next.type !== "question") fireEventsForTrigger(next.id, answerForScore);
+      if (next.type === "end" && (!session || !(leadInfoRef.current.phone || leadInfoRef.current.email || leadInfoRef.current.name))) fireEventsForTrigger("__end__", answerForScore);
     }, 650);
   }
 
@@ -364,7 +395,8 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
     advancingRef.current = true;
     if (answer) setAnswers((a) => ({ ...a, [node.id]: answer }));
     setEntries((es) => [...es, { id: uid(), kind: "user", text: userText, ts: Date.now() }]);
-    if (node.data.kind === "lead_details") fireEventsForTrigger("__lead_details__");
+    if (node.data.kind === "question") fireEventsForTrigger(node.id, answer);
+    if (node.data.kind === "lead_details") fireEventsForTrigger("__lead_details__", answer);
     advanceTo(node.id, handle, answer);
   }
 
