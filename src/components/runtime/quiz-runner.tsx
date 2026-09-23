@@ -572,7 +572,7 @@ function NodeControls({
   onComplete: (userText: string, handle: string | null, answer?: LeadAnswer) => void;
 }) {
   const PALETTE = palette;
-  const [text, setText] = useState("");
+  const [text, setText] = useState(node.data.kind === "name" ? leadInfo.name : "");
   const [multi, setMulti] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const autoAdvanceFiredRef = useRef(false);
@@ -625,6 +625,7 @@ function NodeControls({
             aria-label={data.title || "שם"}
             aria-describedby={hintId}
             autoComplete="name"
+            maxLength={200}
             enterKeyHint="next"
             required={data.required}
             placeholder={data.placeholder && data.placeholder !== "השם שלך" ? data.placeholder : "תקליד/י כאן"}
