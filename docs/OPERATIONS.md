@@ -60,3 +60,24 @@ Application pages use fresh script nonces and cannot be statically cached. Inlin
 Meta connection tests now require a Test Events code from the owner's Events Manager and a positive events_received acknowledgement. This proves API acceptance only; confirm the event in Events Manager separately. Do not place real customer details in synthetic test events.
 
 GitHub Dependabot alerts and automated security-fix PRs are enabled. Secret scanning and push protection are enabled. These repository alerts do not replace application uptime/delivery paging.
+
+## External availability monitor
+
+.github/workflows/availability.yml checks the login page, the published probiotic quiz and unauthenticated worker rejection every 30 minutes, with three attempts per check. It runs outside Vercel, opens one GitHub issue assigned to the repository owner on failure and closes that issue after recovery. No response bodies, session tokens or customer records are logged. It uses only the short-lived GitHub workflow token; no production service credential is copied into GitHub.
+
+Enable email notifications for assigned issues and Actions failures in the owner's GitHub notification settings. Delivery to the owner's requested email address is not verified by creating a workflow. Verify a real notification before treating email alerting as operational.
+
+Scheduled GitHub Actions can be delayed and public-repository schedules can be disabled after 60 days of repository inactivity. This is basic availability monitoring, not a paging SLA. A published quiz slug change requires updating the monitored path. This monitor does not measure worker backlog, delivery acknowledgements, browser hydration, restore health, or Meta acceptance.
+
+## Backup activation decision (2026-09-23)
+
+The owner has no existing backup destination. No database or media archive has been exported to an unapproved destination. The current Supabase Free plan does not provide the Pro daily-backup feature.
+
+The simplest managed database option is Supabase Pro, starting at USD 25/month, with seven days of daily database backups. Additional usage/resources may cost more. Upgrade only after explicit cost approval, verify a completed backup in the dashboard, and conduct an isolated restore drill. Database backups do not include Storage object bytes: media still requires a separate owner-controlled destination and a restore check.
+
+For an external backup destination, require a private bucket, restricted write credentials, encryption, a separately retained recovery key if using client-side encryption, 7 daily and 4 weekly restore points, and an isolated restoration target. Do not use this public repository or its public workflow artifacts for customer backups. Provisioning, exporting, uploading and restoring remain pending until the destination and any costs are approved. A documented plan is not a completed backup.
+
+Official references:
+- https://supabase.com/pricing
+- https://supabase.com/docs/guides/platform/backups
+- https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule
