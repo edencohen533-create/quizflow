@@ -893,7 +893,7 @@ function NodeControls({
           </div>
         )}
         {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
-        <div className="flex justify-end pt-1">
+        <div className="flex justify-start pt-1">
           <button type="submit" className="min-h-11 rounded-[4px] border bg-white px-4 py-2 text-[length:inherit] font-semibold" style={{ borderColor: PALETTE.buttonBorder, color: PALETTE.buttonText }}>
             {data.buttonLabel || "שליחה"}
           </button>
