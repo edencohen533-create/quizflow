@@ -457,7 +457,7 @@ function LeadDetailsForm({ data, onChange, availableParams }: { data: LeadDetail
         <ParamChips params={availableParams} onInsert={(token) => onChange({ ...data, title: appendToken(data.title ?? "", token) })} />
       </Field>
       <Field label="טקסט כפתור השליחה">
-        <Input value={data.buttonLabel ?? ""} onChange={(event) => onChange({ ...data, buttonLabel: event.target.value })} placeholder="שליחה" />
+        <Input aria-label="טקסט כפתור השליחה" value={data.buttonLabel ?? ""} onChange={(event) => onChange({ ...data, buttonLabel: event.target.value })} placeholder="שליחה" />
       </Field>
       <div className="flex items-center justify-between">
         <Label className="text-xs text-muted-foreground">כתובת מייל חובה</Label>
