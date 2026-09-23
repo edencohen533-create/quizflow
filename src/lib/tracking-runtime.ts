@@ -61,9 +61,10 @@ export function fireTrackingEvent(def: QuizTrackingEvent, ctx: FireContext) {
     }
   }
 
-  if (def.sendToPixel && ctx.settings.metaPixelId) {
-    once("meta:" + ctx.settings.metaPixelId, () => sendMetaPixelEvent(
-      ctx.settings.metaPixelId, eventName, def.name === "Custom",
+  const metaPixelId = ctx.settings.metaPixelId;
+  if (def.sendToPixel && metaPixelId) {
+    once("meta:" + metaPixelId, () => sendMetaPixelEvent(
+      metaPixelId, eventName, def.name === "Custom",
       def.value != null ? { value: def.value, currency: def.currency || "ILS" } : {},
       eventId,
     ));

@@ -173,7 +173,7 @@ export function TrackingEventDialog({
               <Switch aria-label="Meta Pixel" checked={sendToPixel} onCheckedChange={setSendToPixel} />
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span>Conversions API (שרת)</span>
+              <span>Meta Conversions API (שרת)</span>
               <Switch aria-label="Meta CAPI" checked={sendToCapi} onCheckedChange={setSendToCapi} />
             </div>
             <div className="flex items-center justify-between text-sm">
