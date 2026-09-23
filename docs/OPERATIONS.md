@@ -41,7 +41,9 @@ Use an approved owner-controlled destination, encryption, restricted access and 
 
 Inventory each consumer and its environment first. Generate replacement credentials using the provider-supported mechanism, deploy consumers, verify successful authenticated calls, then revoke the old credential. Do not print secret values.
 
-Rotating QUIZ_SESSION_SECRET invalidates existing visitor capabilities: schedule it intentionally or implement a bounded dual-key transition first. Rotate DELIVERY_CRON_SECRET together in Vercel and Vault and verify the scheduler. Rotating Supabase root/service or Meta tokens without updating every consumer can interrupt submissions or delivery.
+QUIZ_SESSION_SECRET is now required and must be a dedicated random secret (at least 32 characters), never a database service key. New capabilities always use it. For a planned transition, set QUIZ_SESSION_PREVIOUS_SECRET to the old signing secret and QUIZ_SESSION_PREVIOUS_VALID_UNTIL to an explicit UTC deadline covering the four-hour capability lifetime plus rollout time. The previous key verifies only before that deadline; invalid/missing/expired deadlines deny it automatically. Remove the previous-secret environment variables after the grace period. Never retain an unbounded previous-key fallback.
+
+The 2026-09-23 production transition uses sensitive Vercel variables and expires old-key verification at 2026-09-23T09:04:03.555Z. Root database/API credentials remain a separate inventory-and-rotation task; the signing-key transition does not revoke those credentials. Rotate DELIVERY_CRON_SECRET together in Vercel and Vault and verify the scheduler. Rotating Supabase root/service or Meta tokens without updating every consumer can interrupt submissions or delivery.
 
 Require owner enrollment for application and platform MFA, retain recovery methods securely, and rehearse account recovery. Do not enroll a factor on another person's behalf.
 
@@ -50,3 +52,11 @@ Require owner enrollment for application and platform MFA, retain recovery metho
 Vercel builds gate deployment on npm run check:qa, TypeScript, production dependency audit and the optimized build. SQL checks under tests/sql run in transactions and roll back their fixtures. API/browser checks must use isolated test accounts and remove their objects/accounts afterward.
 
 Function region hnd1 matches the current database region. Reevaluate it if the database moves. The measured 40-request check is not a sustained capacity guarantee.
+
+## Browser and Meta validation
+
+Application pages use fresh script nonces and cannot be statically cached. Inline styles remain allowed for the visual editor. Custom author tracking runs in /api/tracking/sandbox with an HTTP-enforced opaque sandbox, including when opened directly. Do not add allow-same-origin to this policy.
+
+Meta connection tests now require a Test Events code from the owner's Events Manager and a positive events_received acknowledgement. This proves API acceptance only; confirm the event in Events Manager separately. Do not place real customer details in synthetic test events.
+
+GitHub Dependabot alerts and automated security-fix PRs are enabled. Secret scanning and push protection are enabled. These repository alerts do not replace application uptime/delivery paging.

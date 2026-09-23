@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireQuizOwner } from "@/lib/security/owner";
-import { securePost, uuid } from "@/lib/security/http";
+import { HttpError, securePost, uuid } from "@/lib/security/http";
 
 export const POST = securePost(async (_req, body) => {
   const quizId = uuid(body.quizId);
   await requireQuizOwner(quizId);
+  const testEventCode = typeof body.testEventCode === "string" ? body.testEventCode.trim() : "";
+  if (!/^[A-Za-z0-9_-]{4,100}$/.test(testEventCode)) {
+    throw new HttpError(400, "יש להזין קוד בדיקה מתוך Test Events ב-Meta Events Manager");
+  }
   const admin = createAdminClient();
   const [{ data: settings }, { data: secret }] = await Promise.all([
     admin.from("quiz_tracking_settings").select("meta_pixel_id").eq("quiz_id", quizId).maybeSingle(),
@@ -31,6 +35,7 @@ export const POST = securePost(async (_req, body) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         access_token: token,
+        test_event_code: testEventCode,
         data: [
           {
             event_name: "TestEvent",
@@ -44,8 +49,8 @@ export const POST = securePost(async (_req, body) => {
     });
     const data = await res.json();
 
-    if (!res.ok || data.error) {
-      const message = `Meta rejected the test (HTTP ${res.status})`;
+    if (!res.ok || data.error || !(Number(data.events_received) > 0)) {
+      const message = data.error?.code === 190 ? "טוקן Meta אינו תקף. יש לעדכן אותו ולנסות שוב." : data.error?.code === 100 ? "יש לבדוק את Pixel ID ואת הרשאות הטוקן ב-Meta." : `Meta לא אישרה קליטת אירוע הבדיקה (HTTP ${res.status})`;
       await admin
         .from("quiz_tracking_settings")
         .upsert({ quiz_id: quizId, meta_last_test_status: "error", meta_last_test_error: message, meta_last_test_at: now });

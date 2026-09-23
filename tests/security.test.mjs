@@ -435,3 +435,68 @@ test("Meta delivery requires a positive provider acknowledgement, not just HTTP 
   }
  } finally {globalThis.fetch=original;}
 });
+
+test("page CSP restricts scripts to the fresh nonce and blocks inline handlers",()=>{
+ const {pageCsp}=loader()("src/lib/security/csp.ts");
+ const policy=pageCsp("randomNonceFixture123456",false);
+ const scripts=policy.split("; ").find(s=>s.startsWith("script-src "));
+ assert.match(scripts,/'nonce-randomNonceFixture123456'/);
+ assert.doesNotMatch(scripts,/unsafe-inline|unsafe-eval/);
+ assert.match(policy,/script-src-attr 'none'/);
+ assert.match(policy,/frame-ancestors 'self'/);
+ assert.match(pageCsp("randomNonceFixture654321",true),/frame-ancestors \*/);
+ assert.throws(()=>pageCsp("injected'; script-src *",true));
+});
+test("tracking document stays sandboxed at top level and rejects configuration injection",async()=>{
+ const {GET}=loader()("src/app/api/tracking/sandbox/route.ts");
+ const r=GET(new Request("https://quiz.example/api/tracking/sandbox?gtm="+encodeURIComponent('</script><script>alert(1)</script>')+"&pixel=123456"));
+ assert.match(r.headers.get("content-security-policy"),/^sandbox allow-scripts;/);
+ assert.doesNotMatch(r.headers.get("content-security-policy"),/allow-same-origin|allow-top-navigation|allow-forms/);
+ const text=await r.text();
+ assert.doesNotMatch(text,/alert\(1\)/);
+ assert.ok(text.includes('const gtm=null'));
+ assert.ok(text.includes('const pixel="123456"'));
+});
+
+test("Meta test requires a test code before reading server credentials",async()=>{
+ let touched=false;
+ const POST=loader({"@/lib/security/owner":{requireQuizOwner:async()=>({})},"@/lib/supabase/admin":{createAdminClient:()=>{touched=true;return db();}}})("src/app/api/tracking/test-meta/route.ts").POST;
+ assert.equal((await POST(request({quizId:QUIZ}))).status,400);
+ assert.equal(touched,false);
+});
+test("Meta test forwards the debug code and requires actual event acknowledgement",async()=>{
+ const original=globalThis.fetch;
+ try {
+  for(const received of [0,1]){
+   const database=db({quiz_tracking_settings:{data:{meta_pixel_id:"123456789"}},quiz_tracking_secrets:{data:{meta_access_token:"fixture-only"}}});
+   globalThis.fetch=async(_url,options)=>{const payload=JSON.parse(options.body);assert.equal(payload.test_event_code,"TEST12345");assert.equal(payload.data[0].event_name,"TestEvent");return new Response(JSON.stringify({events_received:received}));};
+   const POST=loader({"@/lib/security/owner":{requireQuizOwner:async()=>({})},"@/lib/supabase/admin":{createAdminClient:()=>database}})("src/app/api/tracking/test-meta/route.ts").POST;
+   const result=await (await POST(request({quizId:QUIZ,testEventCode:"TEST12345"}))).json();
+   assert.equal(result.ok,received===1);
+  }
+ } finally {globalThis.fetch=original;}
+});
+
+test("session key transition preserves active capabilities only during explicit grace",()=>{
+ const names=["QUIZ_SESSION_SECRET","QUIZ_SESSION_PREVIOUS_SECRET","QUIZ_SESSION_PREVIOUS_VALID_UNTIL"];
+ const old=Object.fromEntries(names.map(k=>[k,process.env[k]])),now=Date.now();
+ const auth=t=>request({}, {authorization:"Bearer "+t.token});
+ try{
+  process.env.QUIZ_SESSION_SECRET="old-dedicated-fixture-key-over-thirty-two-characters";
+  const previous=session.issuePublicSession(QUIZ,WORKSPACE,now);
+  process.env.QUIZ_SESSION_PREVIOUS_SECRET=process.env.QUIZ_SESSION_SECRET;
+  process.env.QUIZ_SESSION_SECRET="new-dedicated-fixture-key-over-thirty-two-characters";
+  process.env.QUIZ_SESSION_PREVIOUS_VALID_UNTIL=new Date(now+60000).toISOString();
+  assert.equal(session.verifyPublicSession(auth(previous),now+1000).quizId,QUIZ);
+  const current=session.issuePublicSession(QUIZ,WORKSPACE,now);
+  assert.equal(session.verifyPublicSession(auth(current),now+61000).quizId,QUIZ);
+  assert.throws(()=>session.verifyPublicSession(auth(previous),now+61000),/Invalid session/);
+  process.env.QUIZ_SESSION_PREVIOUS_VALID_UNTIL="invalid";
+  assert.throws(()=>session.verifyPublicSession(auth(previous),now+1000),/Invalid session/);
+ }finally{for(const key of names){if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];}}
+});
+test("database service key cannot silently replace a missing session signing secret",()=>{
+ const key=process.env.QUIZ_SESSION_SECRET,service=process.env.SUPABASE_SERVICE_ROLE_KEY;
+ try{delete process.env.QUIZ_SESSION_SECRET;process.env.SUPABASE_SERVICE_ROLE_KEY="database-only-secret-that-must-not-sign-visitors";assert.throws(()=>session.issuePublicSession(QUIZ,WORKSPACE),/unavailable/);}
+ finally{process.env.QUIZ_SESSION_SECRET=key;if(service===undefined)delete process.env.SUPABASE_SERVICE_ROLE_KEY;else process.env.SUPABASE_SERVICE_ROLE_KEY=service;}
+});
