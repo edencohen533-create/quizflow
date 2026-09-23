@@ -20,6 +20,8 @@ function loader(mocks = {}) {
     const require = (name) => {
       if (Object.hasOwn(mocks, name)) return mocks[name];
       if (name === "server-only") return {};
+      if (name === "./shared-rate-limit") return { sharedBudget: async () => true };
+      if (name === "next/server") return { ...nativeRequire(name), after: () => {} };
       if (name.startsWith("@/")) return load(path.resolve("src", name.slice(2)) + ".ts");
       if (name.startsWith(".")) return load(path.resolve(path.dirname(filename), name) + ".ts");
       return nativeRequire(name);
@@ -48,6 +50,7 @@ function db(results = {}) {
   const calls = [];
   const client = {
     calls,
+    async rpc(name,args) { const call={rpc:name,args};calls.push(call);const value=results[name];return typeof value==="function"?value(call):value??{data:1,error:null}; },
     auth: { getUser: async () => ({ data: { user: { id: "owner" } } }) },
     from(table) {
       const call = { table, filters: [] };
@@ -74,7 +77,7 @@ function db(results = {}) {
   return client;
 }
 const baseNode = { id: "question", type: "question", data: { kind: "question", title: "Trusted title", paramKey: "trusted_key", required: true, answerType: "single_choice", options: [{ id: "option", label: "Trusted label", score: 7 }] } };
-const quiz = { id: QUIZ, workspaceId: WORKSPACE, status: "active", name: "QA", slug: "qa", nodes: [baseNode, { id: "end", type: "end", data: { kind: "end", title: "Done" } }] };
+const quiz = { id: QUIZ, workspaceId: WORKSPACE, status: "active", name: "QA", slug: "qa", edges:[{source:"start",target:"question"},{source:"question",target:"end"}], nodes: [{id:"start",type:"start",data:{kind:"start"}}, baseNode, { id: "end", type: "end", data: { kind: "end", title: "Done" } }] };
 const publicSession = session.issuePublicSession(QUIZ, WORKSPACE);
 const claims = session.verifyPublicSession(request({}, { authorization: "Bearer " + publicSession.token }));
 function publicRoute(filename, database, overrides = {}) {
@@ -223,17 +226,18 @@ test("submission uses signed IDs and server-calculated scores; retries ignore du
   const POST = publicRoute("src/app/api/quiz-submissions/route.ts", database);
   const response = await POST(request({ lead: { name: "Test", score: 999, workspaceId: "other" }, answers: [{ nodeId: "question", answerLabel: "fake", optionIds: ["option"], score: 999 }] }));
   assert.equal(response.status, 200);
-  assert.equal(database.calls[0].upsert.id, claims.leadId);
-  assert.equal(database.calls[0].upsert.workspace_id, WORKSPACE);
-  assert.equal(database.calls[0].upsert.score, 7);
-  assert.ok(database.calls.every((c) => c.options.ignoreDuplicates));
+  assert.equal(database.calls[0].args.p_lead.id, claims.leadId);
+  assert.equal(database.calls[0].args.p_lead.workspace_id, WORKSPACE);
+  assert.equal(database.calls[0].args.p_lead.score, 7);
+  assert.equal(database.calls.length,1);
+  assert.equal(database.calls[0].rpc,"submit_quiz_response");
 });
 test("submission failures are visible; no later writes continue after failure", async () => {
-  const database = db({ quiz_submissions: { error: { message: "secret details" } } });
+  const database = db({ submit_quiz_response: { error: { message: "secret details" } } });
   const POST = publicRoute("src/app/api/quiz-submissions/route.ts", database);
-  const response = await POST(request({ lead: { name: "Test" }, answers: [] }));
+  const response = await POST(request({ lead: { name: "Test" }, answers: [{nodeId:"question",optionIds:["option"],answerLabel:"label"}] }));
   assert.equal(response.status, 503);
-  assert.equal(database.calls.length, 2);
+  assert.equal(database.calls.length, 1);
   assert.doesNotMatch(await response.text(), /secret/);
 });
 test("session IDs cannot be swapped; stale heartbeats cannot reopen completed sessions", async () => {
@@ -268,7 +272,7 @@ test("duplicate dispatch is not delivered twice", async () => {
   });
   const POST = publicRoute("src/app/api/dispatch-integrations/route.ts", database, { "@/lib/security/webhook": { sendWebhook: async () => { deliveries++; } } });
   const result = await POST(request({ leadId: claims.leadId }));
-  assert.equal((await result.json()).duplicate, true); assert.equal(deliveries, 0);
+  assert.equal((await result.json()).ok, true); assert.equal(deliveries, 0);
 });
 test("CAPI cannot send arbitrary or disabled event definitions", async () => {
   const database = db();
@@ -330,55 +334,35 @@ test("public APIs reject paused quizzes and mismatched workspace claims", async 
     await assert.rejects(module.requirePublicQuiz(request({}, { authorization: "Bearer " + publicSession.token })), (e) => e.status === 403);
   }
 });
-test("flow write failure never deletes the previous graph", async () => {
-  const database = db({
-    quiz_nodes: (call) => call.upsert ? { error: new Error("write failed") } : { data: [{ id: "old-node" }] },
-    quiz_edges: { data: [] },
-  });
-  const queries = loader()("src/lib/supabase/queries.ts");
-  await assert.rejects(queries.saveFlow(database, QUIZ, [{ ...baseNode, position: { x: 0, y: 0 } }], []), /write failed/);
-  assert.ok(database.calls.every((c) => !c.delete));
+test("atomic flow RPC preserves revision on failed save",async()=>{
+ const database=db({save_quiz_flow:{error:new Error("write failed")}});
+ const state={revision:4};
+ await assert.rejects(loader()("src/lib/supabase/queries.ts").saveFlow(database,QUIZ,[{...baseNode,position:{x:0,y:0}}],[],state),/write failed/);
+ assert.equal(state.revision,4);assert.equal(database.calls.length,1);
 });
-test("flow saves remove only obsolete rows after successful replacement writes", async () => {
-  const database = db({
-    quiz_nodes: (call) => call.select ? { data: [{ id: "old-node" }, { id: "question" }] } : { error: null },
-    quiz_edges: { data: [] },
-  });
-  const queries = loader()("src/lib/supabase/queries.ts");
-  await queries.saveFlow(database, QUIZ, [{ ...baseNode, position: { x: 0, y: 0 } }], []);
-  const deletion = database.calls.find((c) => c.delete);
-  assert.deepEqual(deletion.filters, [["quiz_id", QUIZ], ["in:id", ["old-node"]]]);
-  assert.ok(database.calls.findIndex((c) => c.upsert) < database.calls.indexOf(deletion));
+test("flow revision advances only after confirmed atomic save",async()=>{
+ const database=db({save_quiz_flow:{data:5,error:null}}),state={revision:4};
+ await loader()("src/lib/supabase/queries.ts").saveFlow(database,QUIZ,[{...baseNode,position:{x:0,y:0}}],[],state);
+ assert.equal(state.revision,5);assert.equal(database.calls[0].args.p_expected_revision,4);
 });
-test("invalid flow edges are rejected before any database operation", async () => {
-  const database = db();
-  const queries = loader()("src/lib/supabase/queries.ts");
-  await assert.rejects(queries.saveFlow(database, QUIZ, [], [{ id: "edge", source: "missing", target: "missing" }]));
-  assert.equal(database.calls.length, 0);
+test("stale editor receives actionable conflict without overwriting revision",async()=>{
+ const database=db({save_quiz_flow:{error:{code:"PT409"}}}),state={revision:4};
+ await assert.rejects(loader()("src/lib/supabase/queries.ts").saveFlow(database,QUIZ,[],[],state),/חלון אחר/);
+ assert.equal(state.revision,4);
 });
-test("concurrent flow saves are serialized and a failed save does not poison the queue", async () => {
-  let release;
-  const gate = new Promise((resolve) => { release = resolve; });
-  let writes = 0;
-  const database = db({
-    quiz_nodes: (call) => {
-      if (!call.upsert) return { data: [] };
-      writes++;
-      return writes === 1 ? gate.then(() => ({ error: new Error("first failed") })) : { error: null };
-    },
-    quiz_edges: { data: [] },
-  });
-  const queries = loader()("src/lib/supabase/queries.ts");
-  const first = queries.saveFlow(database, QUIZ, [{ ...baseNode, position: { x: 0, y: 0 } }], []);
-  const second = queries.saveFlow(database, QUIZ, [{ ...baseNode, position: { x: 1, y: 0 } }], []);
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(writes, 1);
-  release();
-  await assert.rejects(first, /first failed/);
-  await second;
-  assert.equal(writes, 2);
+test("invalid graph rejects before RPC",async()=>{
+ const database=db();
+ await assert.rejects(loader()("src/lib/supabase/queries.ts").saveFlow(database,QUIZ,[],[{id:"e",source:"missing",target:"missing"}],{revision:0}));
+ assert.equal(database.calls.length,0);
 });
-
+test("queued saves use the newly confirmed revision",async()=>{
+ let release;const gate=new Promise(r=>{release=r});let calls=0;
+ const database=db({save_quiz_flow:async()=>{calls++;if(calls===1)await gate;return {data:calls,error:null}}}),state={revision:0};
+ const queries=loader()("src/lib/supabase/queries.ts");
+ const first=queries.saveFlow(database,QUIZ,[],[],state),second=queries.saveFlow(database,QUIZ,[],[],state);
+ await new Promise(r=>setImmediate(r));assert.equal(calls,1);release();await first;await second;
+ assert.deepEqual(database.calls.map(c=>c.args.p_expected_revision),[0,1]);
+});
 test("automatic flow cycles resolve to no target instead of an unusable condition node", () => {
   const runtime = loader()("src/lib/quiz-runtime.ts");
   const cyclic = { nodes: [{ id: "start", type: "start", data: { kind: "start" } }, { id: "loop", type: "condition", data: { kind: "condition", rules: [] } }], edges: [{ source: "start", target: "loop" }, { source: "loop", target: "loop" }] };
@@ -396,4 +380,58 @@ test("submission client surfaces transport/server failures instead of claiming s
     };
     assert.equal(await queries.submitPublicQuizResponse({}, quiz, { name: "QA" }, [], publicSession), claims.leadId);
   } finally { globalThis.fetch = original; }
+});
+
+test("condition numeric comparisons reject NaN and select matching answer",()=>{
+ const runtime=loader()("src/lib/quiz-runtime.ts");
+ assert.equal(runtime.conditionMatches({sourceField:"score",operator:"gte",value:"7"},{score:7}),true);
+ assert.equal(runtime.conditionMatches({sourceField:"answer",answerNodeId:"q",operator:"eq",value:"yes"},{answers:{q:{answerLabel:"yes"}}}),true);
+ assert.equal(runtime.conditionMatches({sourceField:"answer",answerNodeId:"q",operator:"gt",value:"1"},{answers:{q:{answerLabel:"NaN"}}}),false);
+});
+test("AB assignment is stable within session and respects zero/full splits",()=>{
+ const {pickAbTestHandle}=loader()("src/lib/quiz-runtime.ts");
+ const node={id:"ab",data:{kind:"ab_test",splitPercent:50}};
+ assert.equal(pickAbTestHandle(node,"session"),pickAbTestHandle(node,"session"));
+ assert.equal(pickAbTestHandle({...node,data:{kind:"ab_test",splitPercent:0}},"session"),"b");
+ assert.equal(pickAbTestHandle({...node,data:{kind:"ab_test",splitPercent:100}},"session"),"a");
+});
+test("condition follows configured target, not first edge",()=>{
+ const {resolveRenderable}=loader()("src/lib/quiz-runtime.ts");
+ const graph={nodes:[{id:"start",type:"start",data:{kind:"start"}},{id:"c",type:"condition",data:{kind:"condition",rules:[{id:"r",sourceField:"score",operator:"gte",value:"7",targetNodeId:"hot"}],elseNodeId:"cold"}},...["hot","cold"].map(id=>({id,type:"end",data:{kind:"end"}}))],edges:[{source:"start",target:"c"},{source:"c",target:"cold"}]};
+ assert.equal(resolveRenderable(graph,"start",null,{score:9}).id,"hot");
+ assert.equal(resolveRenderable(graph,"start",null,{score:0}).id,"cold");
+});
+test("shared limit failure denies instead of silently allowing",async()=>{
+ const {sharedBudget}=loader({"@/lib/supabase/admin":{createAdminClient:()=>({rpc:async()=>({error:{message:"db down"}})})}})("src/lib/security/shared-rate-limit.ts");
+ await assert.rejects(sharedBudget(request({})),/unavailable/);
+});
+test("delivery worker records retry for 503 and terminal failure for 400",async()=>{
+ for(const status of [503,400,200]){
+ const database=db({claim_delivery_jobs:{data:[{id:DEFINITION,quiz_id:QUIZ,integration_id:WORKSPACE,kind:"webhook",payload:{},lease_token:QUIZ}]},integrations:{data:{enabled:true,url:"https://example.com",quiz_id:QUIZ}}});
+ const {processDeliveryJobs}=loader({"@/lib/supabase/admin":{createAdminClient:()=>database},"./webhook":{sendWebhook:async()=>({status,ok:status===200})}})("src/lib/security/delivery.ts");
+ await processDeliveryJobs();
+ const finish=database.calls.find(c=>c.rpc==="finish_delivery_job");
+ assert.equal(finish.args.p_success,status===200);assert.equal(finish.args.p_permanent,status===400);
+ }
+});
+
+test("submission path ignores disconnected contact requirements and rejects skipped questions",()=>{
+ const {submissionPath}=loader()("src/lib/security/submission-path.ts");
+ const disconnected={...quiz,nodes:[...quiz.nodes,{id:"orphan",type:"lead_details",data:{kind:"lead_details",showConsent:true}}]};
+ const valid=answers.normalizeAnswers([{nodeId:"question",optionIds:["option"],answerLabel:"label"}],quiz.nodes);
+ assert.equal(submissionPath(disconnected,valid,"session").some(n=>n.id==="orphan"),false);
+ assert.throws(()=>submissionPath(disconnected,[],"session"),/Required answer/);
+});
+
+test("Meta delivery requires a positive provider acknowledgement, not just HTTP 200",async()=>{
+ const original=globalThis.fetch;
+ try {
+  for(const [body,expected] of [[{events_received:1},true],[{events_received:0},false],[{error:{code:190}},false]]){
+   const database=db({claim_delivery_jobs:{data:[{id:DEFINITION,quiz_id:QUIZ,kind:"capi",payload:{event_name:"Lead"},lease_token:QUIZ}]},quiz_tracking_settings:{data:{meta_pixel_id:"123456789"}},quiz_tracking_secrets:{data:{meta_access_token:"fixture-only"}}});
+   globalThis.fetch=async()=>new Response(JSON.stringify(body),{status:200});
+   const {processDeliveryJobs}=loader({"@/lib/supabase/admin":{createAdminClient:()=>database}})("src/lib/security/delivery.ts");
+   await processDeliveryJobs();
+   assert.equal(database.calls.find(c=>c.rpc==="finish_delivery_job").args.p_success,expected);
+  }
+ } finally {globalThis.fetch=original;}
 });

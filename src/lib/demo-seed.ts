@@ -137,7 +137,7 @@ export async function seedDemoQuiz(supabase: SupabaseClient, workspaceId: string
   });
 
   await supabase.from("quizzes").update({ slug: "financial-fit" }).eq("id", quiz.id);
-  await saveFlow(supabase, quiz.id, nodes, edges);
+  await saveFlow(supabase, quiz.id, nodes, edges, { revision: quiz.flowRevision ?? 0 });
   await updateQuizTheme(supabase, quiz.id, THEME_PRESETS.solina_green);
   await updateQuizMeta(supabase, quiz.id, { status: "active" });
 

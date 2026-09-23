@@ -111,7 +111,7 @@ interface LeadInfoState {
 
 export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSession }) {
   const supabase = useMemo(() => createClient(), []);
-  const nodesById = useMemo(() => new Map(quiz.nodes.map((node) => [node.id, node])), [quiz.nodes]);
+  const nodesById = useMemo(() => new Map(quiz.nodes.map((node): [string, QuizNode] => [node.id, node.data.kind==="action" && node.data.actionKind==="redirect" ? {...node,type:"end",data:{kind:"end",title:"ממשיכים...",text:"",redirectEnabled:true,redirectUrl:node.data.redirectUrl,redirectDelaySeconds:0}} : node])), [quiz.nodes]);
   const searchParams = useSearchParams();
   const utmSource = searchParams.get("utm_source") ?? undefined;
   const startedRef = useRef(false);
@@ -125,7 +125,7 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
 
   const firstNode = useMemo(() => {
     const start = getStartNode(quiz);
-    return start ? resolveRenderable(quiz, start.id) : undefined;
+    return start ? resolveRenderable(quiz, start.id, null, { sessionId: session?.sessionId ?? quiz.id, utmSource }) : undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -323,7 +323,10 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
       startedRef.current = true;
       if (session) recordAnalyticsEvent(supabase, quiz.id, "start", utmSource, session);
     }
-    const next = resolveRenderable(quiz, fromId, handle);
+    const nextAnswers = answerForScore ? { ...answers, [answerForScore.nodeId]: answerForScore } : answers;
+    const next = resolveRenderable(quiz, fromId, handle, {answers:nextAnswers,score:Object.values(nextAnswers).reduce((s,a)=>s+a.score,0),utmSource,sessionId:sessionIdRef.current});
+    if(next && !nodesById.has(next.id)) nodesById.set(next.id,next);
+    if(next?.data.kind==="end" && nodesById.get(next.id)?.data.kind==="action") nodesById.set(next.id,next);
     setActiveNodeId(null);
     if (!next) { advancingRef.current = false; setActiveNodeId(fromId); return; }
 

@@ -206,47 +206,24 @@ export async function deleteQuiz(supabase: SupabaseClient, quizId: string) {
   if (error) throw error;
 }
 
-const flowSaves = new Map<string, Promise<void>>();
-export function saveFlow(supabase: SupabaseClient, quizId: string, nodes: QuizNode[], edges: QuizEdge[]): Promise<void> {
-  // Serialize saves from this editor so an older response cannot replace a newer
-  // graph. A cross-client transaction/version check is a database follow-up.
+export interface FlowSaveState { revision: number; pending?: Promise<void> }
+export function saveFlow(supabase: SupabaseClient, quizId: string, nodes: QuizNode[], edges: QuizEdge[], state: FlowSaveState): Promise<void> {
   const snapshot = structuredClone({ nodes, edges });
-  const next = (flowSaves.get(quizId) ?? Promise.resolve()).catch(() => {}).then(async () => {
+  const next = (state.pending ?? Promise.resolve()).catch(() => {}).then(async () => {
     const nodeIds = new Set(snapshot.nodes.map((n) => n.id));
-    if (nodeIds.size !== snapshot.nodes.length || new Set(snapshot.edges.map((edge) => edge.id)).size !== snapshot.edges.length ||
-        snapshot.edges.some((edge) => !nodeIds.has(edge.source) || !nodeIds.has(edge.target))) throw new Error("התרשים מכיל חיבורים לא תקינים");
-    const [oldNodes, oldEdges] = await Promise.all([
-      supabase.from("quiz_nodes").select("id").eq("quiz_id", quizId),
-      supabase.from("quiz_edges").select("id").eq("quiz_id", quizId),
-    ]);
-    if (oldNodes.error) throw oldNodes.error;
-    if (oldEdges.error) throw oldEdges.error;
-    // Persist replacements BEFORE deleting obsolete rows; a failed insert must
-    // never leave a previously working quiz with every node deleted.
-    if (snapshot.nodes.length) {
-      const { error } = await supabase.from("quiz_nodes").upsert(snapshot.nodes.map((n) => nodeToRow(quizId, n)), { onConflict: "quiz_id,id" });
-      if (error) throw error;
-    }
-    if (snapshot.edges.length) {
-      const { error } = await supabase.from("quiz_edges").upsert(snapshot.edges.map((edge) => edgeToRow(quizId, edge)), { onConflict: "quiz_id,id" });
-      if (error) throw error;
-    }
-    const edgeIds = new Set(snapshot.edges.map((edge) => edge.id));
-    for (const [table, ids] of [
-      ["quiz_edges", (oldEdges.data ?? []).filter((row) => !edgeIds.has(row.id)).map((row) => row.id)],
-      ["quiz_nodes", (oldNodes.data ?? []).filter((row) => !nodeIds.has(row.id)).map((row) => row.id)],
-    ] as const) {
-      if (ids.length) {
-        const { error } = await supabase.from(table).delete().eq("quiz_id", quizId).in("id", ids);
-        if (error) throw error;
-      }
-    }
-    const { error } = await supabase.from("quizzes").update({ updated_at: new Date().toISOString() }).eq("id", quizId);
+    if (nodeIds.size !== snapshot.nodes.length || new Set(snapshot.edges.map((e) => e.id)).size !== snapshot.edges.length ||
+        snapshot.edges.some((e) => !nodeIds.has(e.source) || !nodeIds.has(e.target))) throw new Error("התרשים מכיל חיבורים לא תקינים");
+    const { data, error } = await supabase.rpc("save_quiz_flow", {
+      p_quiz_id: quizId, p_expected_revision: state.revision,
+      p_nodes: snapshot.nodes.map((n) => nodeToRow(quizId, n)),
+      p_edges: snapshot.edges.map((e) => edgeToRow(quizId, e)),
+    });
+    if (error?.code === "PT409" || error?.code === "40001") throw new Error("השאלון השתנה בחלון אחר. העתיקו את השינויים וטענו מחדש לפני שמירה.");
     if (error) throw error;
+    if (typeof data !== "number") throw new Error("השמירה לא אושרה");
+    state.revision = data;
   });
-  flowSaves.set(quizId, next);
-  const cleanup = () => { if (flowSaves.get(quizId) === next) flowSaves.delete(quizId); };
-  void next.then(cleanup, cleanup);
+  state.pending = next;
   return next;
 }
 

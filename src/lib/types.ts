@@ -88,6 +88,7 @@ export interface LeadDetailsNodeData {
 export interface ConditionRule {
   id: string;
   sourceField: "score" | "utm_source" | "answer";
+  answerNodeId?: string;
   operator: "gt" | "lt" | "eq" | "gte" | "lte";
   value: string;
   targetNodeId: string | null;
@@ -227,6 +228,7 @@ export const THEME_PRESETS: Record<string, QuizTheme> = {
 };
 
 export interface Quiz {
+  flowRevision?: number;
   id: string;
   workspaceId: string;
   name: string;

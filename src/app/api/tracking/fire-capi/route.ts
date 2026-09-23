@@ -1,8 +1,10 @@
+import { after } from "next/server";
+import { processDeliveryJobs } from "@/lib/security/delivery";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { requirePublicQuiz } from "@/lib/security/public-quiz";
 import { securePost, HttpError, uuid, stringField } from "@/lib/security/http";
-import { operationId } from "@/lib/security/ids";
+
 
 function sha256(value: string) { return crypto.createHash("sha256").update(value.trim().toLowerCase()).digest("hex"); }
 
@@ -29,13 +31,6 @@ export const POST = securePost(async (req, body) => {
     return NextResponse.json({ ok: false, error: "meta not configured" });
   }
 
-  const { error: claimError } = await admin.from("quiz_tracking_activity").insert({
-    id: operationId("capi:" + definitionId, session.sessionId), quiz_id: quizId,
-    message: "התחילה שליחת אירוע " + eventName,
-  });
-  if (claimError?.code === "23505") return NextResponse.json({ ok: true, duplicate: true });
-  if (claimError) throw new HttpError(503, "Could not claim event");
-
   const userData: Record<string, unknown> = {
     client_ip_address: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim(),
     client_user_agent: req.headers.get("user-agent") ?? undefined,
@@ -43,33 +38,13 @@ export const POST = securePost(async (req, body) => {
   if (email) userData.em = [sha256(email)];
   if (phone) userData.ph = [sha256(phone.replace(/\D/g, ""))];
 
-  try {
-    const res = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events`, {
-      method: "POST",
-      redirect: "error",
-      signal: AbortSignal.timeout(8000),
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        access_token: token,
-        data: [
-          {
-            event_name: eventName,
-            event_id: eventId,
-            event_time: Math.floor(Date.now() / 1000),
-            action_source: "website",
-            event_source_url: sourceUrl,
-            user_data: userData,
-            custom_data: definition.value != null ? { value: definition.value, currency: definition.currency || "ILS" } : undefined,
-          },
-        ],
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok || data.error) {
-      return NextResponse.json({ ok: false, error: `Meta rejected event (HTTP ${res.status})` });
-    }
-    return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ ok: false, error: "שגיאת רשת" });
-  }
+  const {error} = await admin.from("delivery_jobs").upsert({
+    dedupe_key:"capi:"+eventId,quiz_id:quizId,kind:"capi",
+    payload:{event_name:eventName,event_id:eventId,event_time:Math.floor(Date.now()/1000),action_source:"website",
+      event_source_url:sourceUrl,user_data:userData,
+      custom_data:definition.value != null ? {value:definition.value,currency:definition.currency || "ILS"} : undefined},
+  },{onConflict:"dedupe_key",ignoreDuplicates:true});
+  if(error) throw new HttpError(503,"Could not queue event");
+  after(()=>processDeliveryJobs());
+  return NextResponse.json({ok:true,queued:true});
 });
