@@ -69,20 +69,51 @@ export function resolveRenderable(quiz: Quiz, fromId: string, handle: string | n
   return node && !AUTO_ADVANCE_TYPES.has(node.type) ? node : undefined;
 }
 export function validatePublishableFlow(quiz: Quiz): string[] {
-  const errors:string[]=[];
-  const start=getStartNode(quiz);
-  if(!start || !quiz.nodes.some(n=>n.type==="end" || (n.data.kind==="action"&&n.data.actionKind==="redirect"))) errors.push("חסר צומת התחלה או סיום");
-  const reachable=new Set<string>(), pending=start?[start.id]:[];
-  while(pending.length){const id=pending.pop()!;if(reachable.has(id))continue;reachable.add(id);const n=findNode(quiz,id);if(!n){errors.push("חיבור לצומת חסר");continue;}
-    for(const e of quiz.edges.filter(e=>e.source===id))pending.push(e.target);
-    if("nextNodeId" in n.data && n.data.nextNodeId)pending.push(n.data.nextNodeId);
-    if(n.data.kind==="condition"){
-      for(const r of n.data.rules){if(r.sourceField==="answer"&&!r.answerNodeId)errors.push("יש לבחור שאלה בתנאי");if(r.targetNodeId)pending.push(r.targetNodeId);else if(!quiz.edges.some(e=>e.source===id&&e.sourceHandle===r.id))errors.push("חסר יעד לתנאי");}
-      if(n.data.elseNodeId)pending.push(n.data.elseNodeId);else if(!quiz.edges.some(e=>e.source===id&&(e.sourceHandle==="else"||e.sourceHandle===null)))errors.push("חסר מסלול ברירת מחדל לתנאי");
+  const errors = new Set<string>();
+  const start = getStartNode(quiz);
+  if (!start) return ["חסר צומת התחלה"];
+  const visited = new Set<string>(), visiting = new Set<string>();
+  function visit(node: QuizNode | undefined) {
+    if (!node) { errors.add("יש מסלול ללא המשך או חיבור לצומת חסר"); return; }
+    if (visiting.has(node.id)) { errors.add("יש מסלול מעגלי שאינו מאפשר לסיים את השאלון"); return; }
+    if (visited.has(node.id)) return;
+    visiting.add(node.id);
+    const data = node.data;
+    const targets: (QuizNode | undefined)[] = [];
+    if (data.kind === "end") {
+      // End cards are terminal even if stale editor edges remain.
+    } else if (data.kind === "action") {
+      if (data.actionKind !== "redirect") {
+        errors.add("פעולת " + data.actionKind + " אינה מחוברת. הגדירו שליחה דרך אינטגרציות או טראקינג לפני הפרסום.");
+      } else if (!/^https?:\/\//i.test(data.redirectUrl ?? "")) {
+        errors.add("כתובת ההפניה אינה תקינה");
+      }
+    } else if (data.kind === "condition") {
+      for (const rule of data.rules) {
+        if (rule.sourceField === "answer" && !rule.answerNodeId) errors.add("יש לבחור שאלה בתנאי");
+        targets.push(rule.targetNodeId ? findNode(quiz, rule.targetNodeId) : nextNodeFrom(quiz, node.id, rule.id));
+      }
+      targets.push(data.elseNodeId ? findNode(quiz, data.elseNodeId) : nextNodeFrom(quiz, node.id, "else"));
+    } else if (data.kind === "ab_test") {
+      for (const handle of ["a", "b"]) {
+        if (!quiz.edges.some(edge => edge.source === node.id && edge.sourceHandle === handle)) errors.add("יש לחבר את שני מסלולי A/B");
+        targets.push(nextNodeFrom(quiz, node.id, handle));
+      }
+    } else if (data.kind === "question" && (data.answerType === "single_choice" || data.answerType === "multi_choice")) {
+      if (!data.options.length) errors.add("יש שאלה ללא אפשרויות בחירה");
+      if (data.combineAnswers) targets.push(nextNodeFrom(quiz, node.id));
+      else {
+        for (const option of data.options) targets.push(nextNodeFrom(quiz, node.id, option.id));
+        if (data.answerType === "multi_choice" && !data.required) targets.push(nextNodeFrom(quiz, node.id));
+      }
+    } else {
+      // Automatic score nodes prioritize their configured direct continuation.
+      targets.push(data.kind === "score" && data.nextNodeId ? findNode(quiz, data.nextNodeId) : nextNodeFrom(quiz, node.id));
     }
-    if(n.data.kind==="ab_test" && (!quiz.edges.some(e=>e.source===id&&e.sourceHandle==="a") || !quiz.edges.some(e=>e.source===id&&e.sourceHandle==="b")))errors.push("יש לחבר את שני מסלולי A/B");
-    if(n.data.kind==="action" && n.data.actionKind!=="redirect")errors.push("פעולת "+n.data.actionKind+" אינה מחוברת. הגדירו שליחה דרך אינטגרציות או טראקינג לפני הפרסום.");
-    if(n.data.kind==="action" && n.data.actionKind==="redirect" && !/^https?:\/\//i.test(n.data.redirectUrl??""))errors.push("כתובת ההפניה אינה תקינה");
+    for (const target of targets) visit(target);
+    visiting.delete(node.id);
+    visited.add(node.id);
   }
-  return [...new Set(errors)];
+  visit(start);
+  return [...errors];
 }
