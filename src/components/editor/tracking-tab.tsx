@@ -34,7 +34,7 @@ import { TrackingEventDialog } from "@/components/editor/tracking-event-dialog";
 import { toast } from "sonner";
 
 const GTM_REGEX = /^GTM-[A-Z0-9]+$/i;
-const PIXEL_ID_REGEX = /^\d+$/;
+const PIXEL_ID_REGEX = /^\d{5,30}$/;
 
 function TRIGGER_LABEL(nodeId: string | null, quiz: Quiz) {
   if (nodeId === null) return "בטעינת השאלון";
@@ -236,11 +236,13 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
   }, [load]);
 
   async function handleSavePixelId() {
-    if (pixelId && !PIXEL_ID_REGEX.test(pixelId)) {
-      toast.error("Pixel ID חייב להכיל ספרות בלבד");
+    const normalizedPixelId = pixelId.trim();
+    if (normalizedPixelId && !PIXEL_ID_REGEX.test(normalizedPixelId)) {
+      toast.error("Pixel ID חייב להכיל 5–30 ספרות");
       return;
     }
-    await updateTrackingSettings(supabase, quiz.id, { metaPixelId: pixelId || null });
+    await updateTrackingSettings(supabase, quiz.id, { metaPixelId: normalizedPixelId || null });
+    setPixelId(normalizedPixelId);
     await logTrackingActivity(supabase, quiz.id, `עודכן Meta Pixel ID`);
     setSavedLabel("נשמר");
     setActivity(await listTrackingActivity(supabase, quiz.id));
@@ -344,9 +346,10 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Meta Pixel + Conversions API</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Meta Pixel — מעקב בדפדפן</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">למעקב בדפדפן מספיק מזהה הפיקסל. אין צורך בטוקן או בחיבור לחשבון Meta.</p>
             <Label className="text-xs">Meta Pixel ID</Label>
             <Input
               value={pixelId}
@@ -356,8 +359,11 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
               dir="ltr"
             />
           </div>
+          <details className="space-y-4 rounded-lg border p-3">
+            <summary className="cursor-pointer text-sm font-medium">Conversions API — שליחה מהשרת (אופציונלי)</summary>
+            <p className="text-xs text-muted-foreground">ההגדרות והבדיקה כאן מתייחסות לשליחה מהשרת בלבד. שגיאה בטוקן אינה מעידה על תקלה בפיקסל בדפדפן.</p>
           <div className="space-y-1.5">
-            <Label className="text-xs">Pixel Access Token (Conversions API)</Label>
+            <Label className="text-xs">Access Token (Conversions API)</Label>
             <div className="flex gap-2">
               <Input
                 type={showToken ? "text" : "password"}
@@ -383,12 +389,12 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
             <p className="text-xs text-muted-foreground">העתיקו את הקוד מלשונית Test Events. הקוד משמש לבדיקה זו בלבד.</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={handleTestConnection} disabled={testing || !testEventCode.trim()}>
+            <Button variant="outline" size="sm" onClick={handleTestConnection} disabled={testing || !settings.metaHasToken || !testEventCode.trim()}>
               {testing && <Loader2 className="size-3.5 animate-spin" />}
-              בדוק את החיבור ל-Meta
+              בדוק שליחה מהשרת ל־Meta
             </Button>
             {settings.metaLastTestStatus === "success" && (
-              <span className="flex items-center gap-1 text-xs text-primary"><CheckCircle2 className="size-3.5" /> החיבור תקין</span>
+              <span className="flex items-center gap-1 text-xs text-primary"><CheckCircle2 className="size-3.5" /> שליחת הבדיקה מהשרת הצליחה</span>
             )}
             {settings.metaLastTestStatus === "error" && (
               <span className="flex items-center gap-1 text-xs text-destructive"><XCircle className="size-3.5" /> {settings.metaLastTestError}</span>
@@ -397,6 +403,7 @@ export function TrackingTab({ quiz }: { quiz: Quiz }) {
           <p className="text-xs text-muted-foreground">
             הבדיקה כוללת שליחת אירוע בדיקה ל-Meta Events Manager. היא בודקת את הטוקן השמור, אך אינה מחליפה בדיקה של אירועים חיים.
           </p>
+          </details>
         </CardContent>
       </Card>
 
