@@ -25,6 +25,7 @@ interface EventRow {
   custom_name: string | null;
   trigger_node_id: string | null;
   send_to_pixel: boolean;
+  send_to_tiktok?: boolean;
   send_to_capi: boolean;
   send_to_gtm: boolean;
   send_to_custom_code: boolean;
@@ -59,6 +60,7 @@ function rowToEvent(row: EventRow): QuizTrackingEvent {
     customName: row.custom_name ?? undefined,
     triggerNodeId: row.trigger_node_id,
     sendToPixel: row.send_to_pixel,
+    sendToTikTok: row.send_to_tiktok ?? false,
     sendToCapi: row.send_to_capi,
     sendToGtm: row.send_to_gtm,
     sendToCustomCode: row.send_to_custom_code,
@@ -80,7 +82,8 @@ const DEFAULT_SETTINGS: Omit<QuizTrackingSettings, "quizId" | "updatedAt"> = {
 };
 
 export async function getTrackingSettings(supabase: SupabaseClient, quizId: string): Promise<QuizTrackingSettings> {
-  const { data } = await supabase.from("quiz_tracking_settings").select("*").eq("quiz_id", quizId).maybeSingle();
+  const { data, error } = await supabase.from("quiz_tracking_settings").select("*").eq("quiz_id", quizId).maybeSingle();
+  if (error) throw error;
   if (data) return rowToSettings(data);
   return { quizId, updatedAt: new Date().toISOString(), ...DEFAULT_SETTINGS };
 }
@@ -112,12 +115,13 @@ export interface TrackingEventInput {
   customName?: string;
   triggerNodeId: string | null;
   sendToPixel: boolean;
+  sendToTikTok?: boolean;
   sendToCapi: boolean;
   sendToGtm: boolean;
   sendToCustomCode: boolean;
   customCode?: string;
-  condition?: TrackingCondition;
-  value?: number;
+  condition?: TrackingCondition | null;
+  value?: number | null;
   currency?: string;
   enabled: boolean;
 }
@@ -131,6 +135,7 @@ export async function createTrackingEvent(supabase: SupabaseClient, quizId: stri
       custom_name: input.customName ?? null,
       trigger_node_id: input.triggerNodeId,
       send_to_pixel: input.sendToPixel,
+      send_to_tiktok: input.sendToTikTok ?? false,
       send_to_capi: input.sendToCapi,
       send_to_gtm: input.sendToGtm,
       send_to_custom_code: input.sendToCustomCode,
@@ -153,6 +158,7 @@ export async function updateTrackingEvent(supabase: SupabaseClient, id: string, 
   if (input.name !== undefined) row.name = input.name;
   if (input.customName !== undefined) row.custom_name = input.customName;
   if (input.triggerNodeId !== undefined) row.trigger_node_id = input.triggerNodeId;
+  if (input.sendToTikTok !== undefined) row.send_to_tiktok = input.sendToTikTok;
   if (input.sendToPixel !== undefined) row.send_to_pixel = input.sendToPixel;
   if (input.sendToCapi !== undefined) row.send_to_capi = input.sendToCapi;
   if (input.sendToGtm !== undefined) row.send_to_gtm = input.sendToGtm;
@@ -171,7 +177,8 @@ export async function updateTrackingEvent(supabase: SupabaseClient, id: string, 
 }
 
 export async function deleteTrackingEvent(supabase: SupabaseClient, id: string) {
-  await supabase.from("quiz_tracking_events").delete().eq("id", id);
+  const { error } = await supabase.from("quiz_tracking_events").delete().eq("id", id);
+  if (error) throw error;
 }
 
 export async function duplicateTrackingEvent(supabase: SupabaseClient, quizId: string, event: QuizTrackingEvent) {
@@ -180,6 +187,7 @@ export async function duplicateTrackingEvent(supabase: SupabaseClient, quizId: s
     customName: event.customName,
     triggerNodeId: event.triggerNodeId,
     sendToPixel: event.sendToPixel,
+    sendToTikTok: event.sendToTikTok,
     sendToCapi: event.sendToCapi,
     sendToGtm: event.sendToGtm,
     sendToCustomCode: event.sendToCustomCode,

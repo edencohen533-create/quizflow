@@ -1,3 +1,4 @@
+import { sendTikTokPixelEvent } from "@/lib/tiktok-pixel";
 import { sendMetaPixelEvent } from "@/lib/meta-pixel";
 import { sendSandboxTracking } from "@/lib/tracking-sandbox";
 import { QuizTrackingEvent, QuizTrackingSettings, TrackingCondition } from "@/lib/types";
@@ -34,6 +35,8 @@ interface FireContext {
   sessionToken?: string;
   quizId: string;
   settings: QuizTrackingSettings;
+  tiktokPixelIds?: string[];
+  sentEvents?: Set<string>;
   phone?: string;
   email?: string;
   conditionContext?: Record<string, string | number | undefined>;
@@ -45,25 +48,38 @@ export function fireTrackingEvent(def: QuizTrackingEvent, ctx: FireContext) {
 
   const eventName = def.name === "Custom" ? def.customName || "CustomEvent" : def.name;
   const eventId = generateEventId(def.id, ctx.sessionId);
+  // One attempt per definition/destination/session; conditions are evaluated first.
+  const once = (destination: string, send: () => void) => {
+    const key = eventId + ":" + destination;
+    if (ctx.sentEvents?.has(key)) return;
+    send();
+    ctx.sentEvents?.add(key);
+  };
+  if (def.sendToTikTok) {
+    for (const pixelId of ctx.tiktokPixelIds ?? []) {
+      once("tiktok:" + pixelId, () => { sendTikTokPixelEvent(pixelId, eventName, def.value != null ? { value: def.value, currency: def.currency || "ILS" } : {}, eventId); });
+    }
+  }
 
-  if (def.sendToPixel && ctx.settings.metaPixelId) {
-    sendMetaPixelEvent(
-      ctx.settings.metaPixelId, eventName, def.name === "Custom",
+  const metaPixelId = ctx.settings.metaPixelId;
+  if (def.sendToPixel && metaPixelId) {
+    once("meta:" + metaPixelId, () => sendMetaPixelEvent(
+      metaPixelId, eventName, def.name === "Custom",
       def.value != null ? { value: def.value, currency: def.currency || "ILS" } : {},
       eventId,
-    );
+    ));
   }
 
   if (def.sendToGtm && ctx.settings.gtmContainerId) {
-    sendSandboxTracking("gtm:" + ctx.quizId, { event: { event: "quizflow_conversion", quizflow_event_name: eventName, value: def.value, currency: def.currency, event_id: eventId } }, ctx.settings.gtmContainerId);
+    once("gtm", () => sendSandboxTracking("gtm:" + ctx.quizId, { event: { event: "quizflow_conversion", quizflow_event_name: eventName, value: def.value, currency: def.currency, event_id: eventId } }, ctx.settings.gtmContainerId));
   }
 
   if (def.sendToCustomCode && def.customCode) {
-    sendSandboxTracking("custom:" + ctx.quizId, { code: def.customCode }, undefined, ctx.settings.metaPixelId);
+    once("custom", () => sendSandboxTracking("custom:" + ctx.quizId, { code: def.customCode }, undefined, ctx.settings.metaPixelId));
   }
 
   if (def.sendToCapi && ctx.settings.metaHasToken && ctx.sessionToken) {
-    fetch("/api/tracking/fire-capi", {
+    once("capi", () => { void fetch("/api/tracking/fire-capi", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + ctx.sessionToken },
       body: JSON.stringify({
@@ -77,6 +93,6 @@ export function fireTrackingEvent(def: QuizTrackingEvent, ctx: FireContext) {
         email: ctx.email,
         sourceUrl: typeof window !== "undefined" ? window.location.href : undefined,
       }),
-    }).catch(() => {});
+    }).catch(() => {}); });
   }
 }

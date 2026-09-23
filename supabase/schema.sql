@@ -1044,3 +1044,7 @@ revoke execute on function public.handle_new_user() from public, anon, authentic
 revoke execute on function public.log_initial_lead_status() from public, anon, authenticated;
 revoke execute on function public.on_conversation_message_insert() from public, anon, authenticated;
 commit;
+
+-- Browser destination only: no server token is stored or made public.
+alter table public.quiz_tracking_events
+  add column if not exists send_to_tiktok boolean not null default false;
