@@ -451,33 +451,37 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
                 <img src={blockImageUrl} alt="" className="mx-auto block h-auto w-full max-w-[80%] object-contain" />
               </div>
             );
+            const controls = isActive && (
+              <NodeControls
+                node={node}
+                palette={PALETTE}
+                leadInfo={leadInfo}
+                onLeadInfoChange={(patch) => {
+                  leadInfoRef.current = { ...leadInfoRef.current, ...patch };
+                  setLeadInfo(leadInfoRef.current);
+                }}
+                onComplete={(text, handle, answer) => handleComplete(node, text, handle, answer)}
+              />
+            );
             const bubbleRow = (
               <div key="bubble" className="flex w-full min-w-0 items-end gap-0.5">
                 <Avatar url={quiz.theme.avatarUrl} />
                 <div
                   className="w-fit min-w-0 max-w-[calc(100%-36px)] px-5 py-4 leading-[1.35] sm:px-6"
-                  style={{ background: PALETTE.bubbleBot, color: PALETTE.text, borderRadius: `${PALETTE.radius}px ${PALETTE.radius}px ${PALETTE.radius}px 2px`, overflowWrap: "anywhere" }}
+                  style={{ width: isActive && node.data.kind === "name" ? 420 : undefined, background: PALETTE.bubbleBot, color: PALETTE.text, borderRadius: `${PALETTE.radius}px ${PALETTE.radius}px ${PALETTE.radius}px 2px`, overflowWrap: "anywhere" }}
                 >
                   <BotNodeContent node={node} params={paramValues} />
+                  {node.data.kind === "name" && controls}
                 </div>
               </div>
             );
-            const controlsRow = isActive && (
+            const controlsRow = isActive && node.data.kind !== "name" && (
               <div
                 key="controls"
                 className="mt-4 self-start"
                 style={{ width: "calc(100% - 36px)", marginInlineStart: 36 }}
               >
-                <NodeControls
-                  node={node}
-                  palette={PALETTE}
-                  leadInfo={leadInfo}
-                  onLeadInfoChange={(patch) => {
-                    leadInfoRef.current = { ...leadInfoRef.current, ...patch };
-                    setLeadInfo(leadInfoRef.current);
-                  }}
-                  onComplete={(text, handle, answer) => handleComplete(node, text, handle, answer)}
-                />
+                {controls}
               </div>
             );
 
@@ -599,27 +603,50 @@ function NodeControls({
 
   if (node.data.kind === "name") {
     const data = node.data;
+    const hintId = `name-hint-${node.id}`;
     return (
-      <div className="space-y-2">
-        <input
-          placeholder={data.placeholder || "השם שלך"}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          className="w-full rounded-lg border px-4 py-2.5 text-sm outline-none focus:ring-2"
-          style={{ borderColor: PALETTE.buttonBorder }}
-        />
-        <button
-          className="w-full rounded-lg py-3 text-sm font-semibold text-white disabled:opacity-50"
-          style={{ background: PALETTE.buttonText }}
-          disabled={data.required && !text.trim()}
-          onClick={() => {
-            onLeadInfoChange({ name: text });
-            onComplete(text || "—", null, { nodeId: node.id, questionTitle: data.title, answerLabel: text || "—", score: 0, paramKey: data.paramKey });
-          }}
+      <form
+        className="mt-6"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const name = text.trim();
+          if (data.required && !name) return;
+          onLeadInfoChange({ name });
+          onComplete(name || "—", null, { nodeId: node.id, questionTitle: data.title, answerLabel: name || "—", score: 0, paramKey: data.paramKey });
+        }}
+      >
+        <div
+          className="flex min-h-[58px] items-center rounded-[4px] border-2 bg-white focus-within:ring-2 focus-within:ring-current/20"
+          style={{ borderColor: PALETTE.buttonText, color: PALETTE.buttonText }}
         >
-          המשך
-        </button>
-      </div>
+          <input
+            aria-label={data.title || "שם"}
+            aria-describedby={hintId}
+            autoComplete="name"
+            enterKeyHint="next"
+            required={data.required}
+            placeholder={data.placeholder && data.placeholder !== "השם שלך" ? data.placeholder : "תקליד/י כאן"}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && event.nativeEvent.isComposing) event.preventDefault();
+            }}
+            className="min-w-0 flex-1 bg-transparent px-4 py-3 text-right text-[length:inherit] outline-none placeholder:opacity-60"
+            style={{ color: PALETTE.text }}
+          />
+          <button
+            type="submit"
+            aria-label="שליחת השם והמשך"
+            disabled={!!data.required && !text.trim()}
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center px-3 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M2 12 22 3v7l-13 2 13 2v7L2 12Z" />
+            </svg>
+          </button>
+        </div>
+        <p id={hintId} className="mt-1.5 text-[0.8em]" style={{ color: PALETTE.text }}>לחצי על החץ לשליחה</p>
+      </form>
     );
   }
 
