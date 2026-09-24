@@ -127,3 +127,17 @@
     @apply font-sans;
   }
 }
+
+/* Answer → next question → choices, without a loading bubble or slide. */
+.qf-runner-bg { overflow-anchor: none; }
+.qf-reveal { animation: qf-reveal 350ms ease-out both; }
+.qf-reveal-answer { animation-duration: 300ms; }
+.qf-reveal-step { animation-delay: 300ms; }
+.qf-reveal-controls { animation-delay: 650ms; }
+@keyframes qf-reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qf-reveal { animation: none; }
+}

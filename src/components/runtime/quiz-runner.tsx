@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getImageProps } from "next/image";
@@ -101,8 +101,7 @@ function totalStepsFor(quiz: Quiz): number {
 type Entry =
   | { id: string; kind: "bot"; nodeId: string; ts: number }
   | { id: string; kind: "result"; nodeId: string; ts: number }
-  | { id: string; kind: "user"; text: string; ts: number }
-  | { id: string; kind: "typing"; ts: number };
+  | { id: string; kind: "user"; text: string; ts: number };
 
 interface LeadInfoState {
   name: string;
@@ -310,20 +309,18 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    // Keep the welcome logo visible on the initial screen, including mobile.
+  useLayoutEffect(() => {
+    advancingRef.current = false;
+    activeNodeIdRef.current = activeNodeId;
+    // Position the complete next step before paint, then reveal it in place.
+    // Keep the welcome logo visible, and never scroll to a temporary loader.
     if (entries.length === 1) return;
-    // Land the new active question near the middle of the screen instead of
-    // pinned to the very bottom, so it doesn't feel like it's hiding at the edge.
-    if (activeNodeId && activeNodeRef.current) {
-      activeNodeRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-    } else {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-    }
+    const target = activeNodeRef.current ?? bottomRef.current;
+    target?.scrollIntoView({ behavior: "instant", block: "nearest" });
   }, [entries, activeNodeId]);
 
   function scrollToBottom() {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    bottomRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "end" });
   }
 
   async function submitLead(finalAnswers: Record<string, LeadAnswer>, finalScore: number) {
@@ -381,27 +378,19 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
     const mergedAnswers = answerForScore ? { ...answers, [answerForScore.nodeId]: answerForScore } : answers;
     const mergedScore = Object.values(mergedAnswers).reduce((sum, a) => sum + a.score, 0);
 
-    const typingId = uid();
-    setEntries((es) => [...es, { id: typingId, kind: "typing", ts: Date.now() }]);
-    setTimeout(() => {
-      advancingRef.current = false;
-      setEntries((es) => {
-        const withoutTyping = es.filter((e) => e.id !== typingId);
-        if (next.type === "end") {
-          return [...withoutTyping, { id: uid(), kind: "result", nodeId: next.id, ts: Date.now() }];
-        }
-        return [...withoutTyping, { id: uid(), kind: "bot", nodeId: next.id, ts: Date.now() }];
-      });
-      if (next.type === "end") {
-        if (leadInfoRef.current.phone || leadInfoRef.current.email || leadInfoRef.current.name) void submitLead(mergedAnswers, mergedScore);
-      } else {
-        setActiveNodeId(next.id);
-        setHistory((h) => [...h, next.id]);
-      }
-      pushSessionUpdate(next, Object.keys(mergedAnswers).length, next.type === "end" ? "completed" : "active", mergedAnswers, mergedScore);
-      if (next.type !== "question") fireEventsForTrigger(next.id, answerForScore);
-      if (next.type === "end" && (!session || !(leadInfoRef.current.phone || leadInfoRef.current.email || leadInfoRef.current.name))) fireEventsForTrigger("__end__", answerForScore);
-    }, 650);
+    setEntries((es) => [
+      ...es,
+      { id: uid(), kind: next.type === "end" ? "result" : "bot", nodeId: next.id, ts: Date.now() },
+    ]);
+    if (next.type === "end") {
+      if (leadInfoRef.current.phone || leadInfoRef.current.email || leadInfoRef.current.name) void submitLead(mergedAnswers, mergedScore);
+    } else {
+      setActiveNodeId(next.id);
+      setHistory((h) => [...h, next.id]);
+    }
+    pushSessionUpdate(next, Object.keys(mergedAnswers).length, next.type === "end" ? "completed" : "active", mergedAnswers, mergedScore);
+    if (next.type !== "question") fireEventsForTrigger(next.id, answerForScore);
+    if (next.type === "end" && (!session || !(leadInfoRef.current.phone || leadInfoRef.current.email || leadInfoRef.current.name))) fireEventsForTrigger("__end__", answerForScore);
   }
 
   function handleComplete(node: QuizNode, userText: string, handle: string | null, answer?: LeadAnswer) {
@@ -451,7 +440,7 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
           {entries.map((entry) => {
             if (entry.kind === "user") {
               return (
-                <div key={entry.id} className="flex justify-end">
+                <div key={entry.id} className="qf-reveal qf-reveal-answer flex justify-end">
                   <div className="flex max-w-[75%] flex-col items-end gap-1">
                     <div
                       className="px-5 py-3 leading-relaxed"
@@ -459,19 +448,6 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
                     >
                       {entry.text}
                     </div>
-                  </div>
-                </div>
-              );
-            }
-
-            if (entry.kind === "typing") {
-              return (
-                <div key={entry.id} className="flex items-end justify-start gap-2">
-                  <Avatar url={quiz.theme.avatarUrl} />
-                  <div className="flex items-center gap-1.5 bg-white px-5 py-4" style={{ background: PALETTE.bubbleBot, borderRadius: PALETTE.radius }}>
-                    <span className="size-2 animate-bounce rounded-full bg-current" style={{ color: PALETTE.muted }} />
-                    <span className="size-2 animate-bounce rounded-full bg-current [animation-delay:0.15s]" style={{ color: PALETTE.muted }} />
-                    <span className="size-2 animate-bounce rounded-full bg-current [animation-delay:0.3s]" style={{ color: PALETTE.muted }} />
                   </div>
                 </div>
               );
@@ -527,7 +503,7 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
             const controlsRow = isActive && node.data.kind !== "name" && node.data.kind !== "lead_details" && (
               <div
                 key="controls"
-                className="mt-4 self-start"
+                className="qf-reveal qf-reveal-controls mt-4 self-start"
                 style={{ width: "calc(100% - 36px)", marginInlineStart: 36 }}
               >
                 {controls}
@@ -535,7 +511,7 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
             );
 
             return (
-              <div key={entry.id} className="flex justify-start">
+              <div key={entry.id} data-quiz-node={node.id} data-active={isActive || undefined} className="qf-reveal qf-reveal-step flex justify-start">
                 <div ref={isActive ? activeNodeRef : undefined} className="flex w-full min-w-0 flex-col items-end">
                   {imageBelow ? [bubbleRow, imageCard] : [imageCard, bubbleRow]}
                   {controlsRow}
@@ -981,7 +957,7 @@ function ResultCard({
   }, [shouldRedirect, secondsLeft, redirectUrl]);
 
   return (
-    <div className="flex justify-start">
+    <div className="qf-reveal qf-reveal-step flex justify-start">
       <div
         className="max-w-[92%] border-2 bg-white p-6 text-center shadow-md sm:max-w-[85%]"
         style={{ borderColor: PALETTE.buttonBorder, color: PALETTE.text, borderRadius: PALETTE.radius + 2 }}
