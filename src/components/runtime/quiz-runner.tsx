@@ -312,11 +312,20 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
   useLayoutEffect(() => {
     advancingRef.current = false;
     activeNodeIdRef.current = activeNodeId;
-    // Position the complete next step before paint, then reveal it in place.
-    // Keep the welcome logo visible, and never scroll to a temporary loader.
+    // Reveal the new question around 30% above the viewport bottom.
+    // Move taller steps higher so their controls remain in view where possible.
+    // Position before paint so the opacity animation itself stays stationary.
     if (entries.length === 1) return;
-    const target = activeNodeRef.current ?? bottomRef.current;
-    target?.scrollIntoView({ behavior: "instant", block: "nearest" });
+    const target = activeNodeRef.current;
+    if (!target) {
+      bottomRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
+      return;
+    }
+    const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+    const stepHeight = target.getBoundingClientRect().height;
+    const top = Math.max(24, Math.min(viewportHeight * 0.7, viewportHeight - stepHeight - 88));
+    target.style.scrollMarginTop = `${top}px`;
+    target.scrollIntoView({ behavior: "instant", block: "start" });
   }, [entries, activeNodeId]);
 
   function scrollToBottom() {
@@ -433,7 +442,7 @@ export function QuizRunner({ quiz, session }: { quiz: Quiz; session?: PublicSess
   return (
     <div dir="rtl" className="qf-runner-bg min-h-screen" style={{ fontFamily: PALETTE.fontFamily, fontSize: PALETTE.fontSize, fontWeight: 500 }}>
       <style>{`.qf-runner-bg{background:${desktopBg};}@media (max-width:767px){.qf-runner-bg{background:${mobileBg};}}`}</style>
-      <div className="mx-auto max-w-[680px] px-4 pb-24 pt-6 sm:px-6 sm:pt-10">
+      <div className="mx-auto max-w-[680px] px-4 pb-[max(6rem,30svh)] pt-6 sm:px-6 sm:pt-10">
         {submissionState === "saving" && <p role="status" className="mb-4 text-center">שומרים את הפרטים...</p>}
         {submissionError && <div role="alert" className="mb-4 rounded-lg bg-white p-4 text-red-700">{submissionError}<button className="mx-2 underline" onClick={() => retryRef.current?.()}>נסו שוב</button></div>}
         <div className="space-y-5">
