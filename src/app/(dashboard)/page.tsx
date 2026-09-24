@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ListChecks, Users, Percent, TrendingUp, Plus } from "lucide-react";
+import { ListChecks, Users, Percent, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,7 +7,7 @@ import { KpiCard } from "@/components/dashboard/kpi-card";
 import { LeadsChart } from "@/components/dashboard/leads-chart-lazy";
 import { QuizStatusBadge, LeadStatusBadge } from "@/components/shared/status-badges";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceId, listLeadCounts, listQuizzes, listRecentLeads } from "@/lib/supabase/queries";
+import { getWorkspaceId, getWorkspaceConversion, listLeadCounts, listQuizzes, listRecentLeads } from "@/lib/supabase/queries";
 import { AnalyticsPoint } from "@/lib/types";
 
 function buildLeadsPerDay(leads: { createdAt: string }[]): AnalyticsPoint[] {
@@ -26,10 +26,11 @@ function buildLeadsPerDay(leads: { createdAt: string }[]): AnalyticsPoint[] {
 export default async function DashboardPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
-  const [quizzes, leads, recentLeads] = await Promise.all([
+  const [quizzes, leads, recentLeads, conversion] = await Promise.all([
     listQuizzes(supabase, workspaceId),
     listLeadCounts(supabase, workspaceId),
     listRecentLeads(supabase, workspaceId, 5),
+    getWorkspaceConversion(supabase, workspaceId),
   ]);
 
   const activeQuizzes = quizzes.filter((q) => q.status === "active").length;
@@ -38,8 +39,7 @@ export default async function DashboardPage() {
     const d = new Date(l.createdAt);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   }).length;
-  const avgLeadsPerQuiz = quizzes.length ? Math.round((leads.length / quizzes.length) * 10) / 10 : 0;
-  const hotLeadShare = leads.length ? Math.round((leads.filter((l) => l.category === "hot").length / leads.length) * 100) : 0;
+  const conversionRate = conversion.views ? `${Math.round((conversion.leads / conversion.views) * 1000) / 10}%` : "—";
 
   const chartData = buildLeadsPerDay(leads);
   const recentQuizzes = quizzes.slice(0, 5);
@@ -59,11 +59,10 @@ export default async function DashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <KpiCard label="שאלונים פעילים" value={String(activeQuizzes)} icon={ListChecks} hint={`מתוך ${quizzes.length} סה"כ`} />
         <KpiCard label="לידים החודש" value={String(leadsThisMonth)} icon={Users} />
-        <KpiCard label="אחוז לידים חמים" value={`${hotLeadShare}%`} icon={Percent} hint={`מתוך ${leads.length} לידים`} />
-        <KpiCard label="ממוצע לידים לשאלון" value={String(avgLeadsPerQuiz)} icon={TrendingUp} />
+        <KpiCard label="אחוז המרה" value={conversionRate} icon={Percent} hint={conversion.views ? `${conversion.leads.toLocaleString("he-IL")} לידים מתוך ${conversion.views.toLocaleString("he-IL")} צפיות · כל התקופה` : "אין עדיין צפיות בשאלונים"} />
       </div>
 
       <Card>

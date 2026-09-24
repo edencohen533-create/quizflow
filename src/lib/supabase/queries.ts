@@ -589,3 +589,19 @@ export async function updateProfileName(supabase: SupabaseClient, fullName: stri
 }
 
 export { themeRowToTheme };
+
+
+// Exact counts keep the conversion KPI independent of the API row limit.
+export async function getWorkspaceConversion(
+  supabase: SupabaseClient,
+  workspaceId: string
+): Promise<{ leads: number; views: number }> {
+  const [leads, views] = await Promise.all([
+    supabase.from("leads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase.from("analytics_events").select("id, quizzes!inner(workspace_id)", { count: "exact", head: true })
+      .eq("quizzes.workspace_id", workspaceId).eq("event_type", "view"),
+  ]);
+  if (leads.error) throw leads.error;
+  if (views.error) throw views.error;
+  return { leads: leads.count ?? 0, views: views.count ?? 0 };
+}
