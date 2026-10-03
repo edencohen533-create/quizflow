@@ -12,9 +12,9 @@ export const POST = securePost(async (req, body) => {
   const { session, admin, quiz } = await requirePublicQuiz(req);
   if (!isRecord(body.lead)) throw new HttpError(400, "Invalid lead");
   const lead = body.lead;
-  const name = stringField(lead.name, 200);
-  const phone = stringField(lead.phone, 40);
-  const email = stringField(lead.email, 254);
+  const name = stringField(lead.name, 200).trim();
+  const phone = stringField(lead.phone, 40).trim();
+  const email = stringField(lead.email, 254).trim();
   if (!name && !phone && !email) throw new HttpError(400, "Contact details required");
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, "Invalid email");
   const answers = normalizeAnswers(body.answers, quiz.nodes);

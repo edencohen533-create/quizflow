@@ -10,8 +10,8 @@ const modules = new Map();
 function loadTs(filename) {
   filename = path.resolve(filename);
   if (modules.has(filename)) return modules.get(filename).exports;
-  const module = { exports: {} };
-  modules.set(filename, module);
+  const loadedModule = { exports: {} };
+  modules.set(filename, loadedModule);
   const compiled = ts.transpileModule(readFileSync(filename, "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
@@ -21,8 +21,8 @@ function loadTs(filename) {
       : path.resolve(path.dirname(filename), specifier);
     return loadTs(target + ".ts");
   };
-  new Function("require", "module", "exports", compiled)(require, module, module.exports);
-  return module.exports;
+  new Function("require", "module", "exports", compiled)(require, loadedModule, loadedModule.exports);
+  return loadedModule.exports;
 }
 const queries = loadTs("src/lib/supabase/queries.ts");
 const { isStoredQuizImage } = loadTs("src/lib/quiz-images.ts");

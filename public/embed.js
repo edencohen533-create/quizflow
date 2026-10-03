@@ -23,7 +23,7 @@
   var BASE_URL = (function () {
     try {
       return new URL(CURRENT_SCRIPT.src).origin;
-    } catch (e) {
+    } catch {
       return "";
     }
   })();
@@ -104,14 +104,14 @@
   function markOpened(key) {
     try {
       sessionStorage.setItem(OPENED_KEY_PREFIX + key, "1");
-    } catch (e) {
+    } catch {
       /* ignore */
     }
   }
   function wasOpened(key) {
     try {
       return sessionStorage.getItem(OPENED_KEY_PREFIX + key) === "1";
-    } catch (e) {
+    } catch {
       return false;
     }
   }
