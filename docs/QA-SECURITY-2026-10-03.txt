@@ -1,0 +1,29 @@
+Quizflow QA and security audit — 2026-10-03
+Baseline: main 2026-09-24; fixes prepared on fix/qa-security-2026-10-03.
+
+Fixed
+1. Next.js 16.3.4 -> 16.3.8 and matching eslint-config-next. npm reported critical GHSA-vcvr-r3jv-pc5j. Repository does not use next/og ImageResponse, so an exploitable application path was not demonstrated. Upgrade removes the affected dependency version.
+   Advisory: https://github.com/advisories/GHSA-vcvr-r3jv-pc5j
+2. Contact submission accepted whitespace-only names/phone values as contact details. Trim validated contact fields before checking presence and saving. Regression failed before the fix, passes after.
+3. Live session categories used hard-coded 26/16 thresholds while saved leads used configured score thresholds. Use configured thresholds consistently. Regression failed before the fix, passes after.
+4. Full lint previously failed with five test-loader naming errors and three unused catch warnings. Corrected without changing test behavior.
+5. shadcn is a build-time CLI, not imported by application source. Moved to devDependencies, refreshed compatible transitive dependency fixes, and declared Node >=22 required by installed Supabase packages.
+
+Validation
+- Clean dependency installation with npm ci; final checks ran using bundled Node 24.19.0.
+- 147 automated tests pass (baseline 144); signed capabilities, IDOR/ownership mocks, SSRF/DNS rebinding, content injection, bounded bodies, answer validation, retries, tracking and query regressions included.
+- npm run check:qa passes; full npm run lint passes with zero warnings/errors.
+- Next.js 16.3.8 optimized webpack production build passes, including TypeScript. Build used synthetic public Supabase configuration, not production credentials.
+- npm audit --omit=dev: zero vulnerabilities.
+- External availability probe: login, published probiotic quiz, unauthenticated delivery-worker rejection pass.
+- In-app browser: login form renders, public quiz introduction renders, protected /quizzes redirects to login. No recorded browser errors on these inspected pages. This is smoke testing, not a complete authenticated browser workflow.
+- Supabase read-only checks: RLS enabled on all 25 public tables. Privileged internal RPCs and trigger functions deny EXECUTE to anon/authenticated; only owner-scoped save_quiz_flow and session_meets_mfa intentionally allow authenticated calls. Code review shows owner and MFA checks.
+
+Remaining / limitations
+- Full development dependency audit retains nine HIGH package findings arising from braces <=3.0.3 and its dependants, including Next's lint plugin and shadcn. No compatible upstream fix was offered by npm audit. No forced major downgrade or disabling of the existing Vercel all-dependency audit gate was performed. Current vercel.json deployment gate will therefore fail its full audit until this is resolved.
+- Leaked-password protection is disabled in hosted Supabase. Official docs require Pro or above; no paid upgrade was made. https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
+- RLS enabled without policies on quiz_tracking_secrets/request_buckets is intentional server-only denial, not a request to open client access. SECURITY DEFINER advisor warnings require context; no unjustified privilege widening was applied.
+- Transactional fixture SQL tests against the shared Supabase database were rejected by automatic approval review despite rollback, due to cross-tenant/storage mutation risk without explicit approval. They were not executed or bypassed. Need explicit authorization or an approved isolated Supabase test environment for these tests.
+- Authenticated E2E, MFA recovery/enrollment, genuine Meta/TikTok delivery acknowledgement, sustained load and restore drills remain unverified in this audit. No customer lead submissions were intentionally created.
+- Browser automation launching local Chrome was unavailable; smoke checks used the supported in-app browser instead.
+- Changes are a reviewable branch/PR; production deployment and merge have not been performed.

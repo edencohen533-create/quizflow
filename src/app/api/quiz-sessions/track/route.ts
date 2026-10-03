@@ -16,6 +16,9 @@ export const POST = securePost(async (req, body) => {
     if (path.at(-1)?.id !== node.id) throw new HttpError(400, "Invalid completion");
   }
   const score = answers.reduce((sum, a) => sum + a.score, 0);
+  const thresholds = quiz.nodes.find((n) => n.data.kind === "score")?.data;
+  const hot = thresholds?.kind === "score" ? thresholds.hotThreshold : 26;
+  const warm = thresholds?.kind === "score" ? thresholds.warmThreshold : 16;
   const now = new Date().toISOString();
   const row = {
     id: session.sessionId, quiz_id: quiz.id, workspace_id: quiz.workspaceId, quiz_name: quiz.name,
@@ -25,7 +28,7 @@ export const POST = securePost(async (req, body) => {
     current_node_title: "title" in node.data ? node.data.title : node.data.kind === "message" ? node.data.text : node.type,
     status: body.status as "active" | "completed",
     name: stringField(body.name, 200) || null, phone: stringField(body.phone, 40) || null, email: stringField(body.email, 254) || null,
-    score, category: score >= 26 ? "hot" : score >= 16 ? "warm" : "cold",
+    score, category: score >= hot ? "hot" : score >= warm ? "warm" : "cold",
     utm_source: stringField(body.utmSource, 256) || null,
     utm_medium: stringField(body.utmMedium, 256) || null,
     utm_campaign: stringField(body.utmCampaign, 256) || null,

@@ -12,8 +12,8 @@ function loader(mocks = {}) {
   function load(filename) {
     filename = path.resolve(filename);
     if (cache.has(filename)) return cache.get(filename).exports;
-    const module = { exports: {} };
-    cache.set(filename, module);
+    const loadedModule = { exports: {} };
+    cache.set(filename, loadedModule);
     const source = ts.transpileModule(readFileSync(filename, "utf8"), {
       compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX },
     }).outputText;
@@ -26,8 +26,8 @@ function loader(mocks = {}) {
       if (name.startsWith(".")) return load(path.resolve(path.dirname(filename), name) + ".ts");
       return nativeRequire(name);
     };
-    new Function("require", "module", "exports", source)(require, module, module.exports);
-    return module.exports;
+    new Function("require", "module", "exports", source)(require, loadedModule, loadedModule.exports);
+    return loadedModule.exports;
   }
   return load;
 }
@@ -160,16 +160,16 @@ for (const url of ["http://example.com", "https://127.1", "https://2130706433", 
 }
 test("DNS results are all validated, including mixed public/private answers", async () => {
   let requests = 0;
-  const module = loader({
+  const loadedModule = loader({
     "node:dns/promises": { lookup: async () => [{ address: "8.8.8.8", family: 4 }, { address: "127.0.0.1", family: 4 }] },
     "node:https": { request: () => { requests++; } },
   })("src/lib/security/webhook.ts");
-  await assert.rejects(module.sendWebhook("https://example.com/hook", {}), /not public/);
+  await assert.rejects(loadedModule.sendWebhook("https://example.com/hook", {}), /not public/);
   assert.equal(requests, 0);
 });
 test("webhook pins validated DNS and does not follow redirects", async () => {
   let lookups = 0, requests = 0;
-  const module = loader({
+  const loadedModule = loader({
     "node:dns/promises": { lookup: async () => { lookups++; return [{ address: "8.8.8.8", family: 4 }]; } },
     "node:https": { request: (_url, options, response) => {
       requests++;
@@ -180,7 +180,7 @@ test("webhook pins validated DNS and does not follow redirects", async () => {
       return req;
     } },
   })("src/lib/security/webhook.ts");
-  assert.deepEqual(await module.sendWebhook("https://example.com/hook", {}), { ok: false, status: 302 });
+  assert.deepEqual(await loadedModule.sendWebhook("https://example.com/hook", {}), { ok: false, status: 302 });
   assert.equal(lookups, 1); assert.equal(requests, 1);
 });
 test("webhook blocks header injection before DNS/network", async () => {
@@ -327,11 +327,11 @@ test("relay requires authentication and ignores caller-supplied URLs/secrets", a
 });
 test("public APIs reject paused quizzes and mismatched workspace claims", async () => {
   for (const current of [{ ...quiz, status: "paused" }, { ...quiz, workspaceId: "other" }]) {
-    const module = loader({
+    const loadedModule = loader({
       "@/lib/supabase/admin": { createAdminClient: () => ({}) },
       "@/lib/supabase/queries": { fetchQuizFull: async () => current },
     })("src/lib/security/public-quiz.ts");
-    await assert.rejects(module.requirePublicQuiz(request({}, { authorization: "Bearer " + publicSession.token })), (e) => e.status === 403);
+    await assert.rejects(loadedModule.requirePublicQuiz(request({}, { authorization: "Bearer " + publicSession.token })), (e) => e.status === 403);
   }
 });
 test("atomic flow RPC preserves revision on failed save",async()=>{
@@ -764,4 +764,29 @@ test("TikTok readiness completes when SDK is ready or bounded timeout expires",a
  await waitForTikTokPixels(["C1234567890123456789"],5);
  window.ttq.instance=()=>({ready:()=>{}});
  await waitForTikTokPixels(["C1234567890123456789"],5);
+});
+
+
+test("required names and free text reject whitespace-only answers", () => {
+  for (const kind of ["name", "question"]) {
+    const node = { id: "required", type: kind, data: { kind, title: "Required", required: true, answerType: "text" } };
+    assert.throws(() => answers.normalizeAnswers([{ nodeId: node.id, answerLabel: "   " }], [node]));
+  }
+});
+test("submission rejects whitespace-only contact details without database writes", async () => {
+  const database = db();
+  const POST = publicRoute("src/app/api/quiz-submissions/route.ts", database);
+  const response = await POST(request({ lead: { name: "  ", phone: "  " }, answers: [{ nodeId: "question", optionIds: ["option"], answerLabel: "label" }] }));
+  assert.equal(response.status, 400);
+  assert.equal(database.calls.length, 0);
+});
+test("live sessions use the configured score category thresholds", async () => {
+  const database = db();
+  const current = { ...quiz, nodes: [...quiz.nodes, { id: "score", type: "score", data: { kind: "score", hotThreshold: 5, warmThreshold: 2 } }] };
+  const POST = publicRoute("src/app/api/quiz-sessions/track/route.ts", database, {
+    "@/lib/security/public-quiz": { requirePublicQuiz: async () => ({ quiz: current, session: claims, admin: database }) }
+  });
+  const response = await POST(request({ quizId: QUIZ, sessionId: claims.sessionId, currentNodeId: "end", status: "completed", answers: [{ nodeId: "question", optionIds: ["option"], answerLabel: "label" }] }));
+  assert.equal(response.status, 200);
+  assert.equal(database.calls[0].upsert.category, "hot");
 });
